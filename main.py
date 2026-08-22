@@ -5,7 +5,7 @@ pygame.font.init()
 pygame.mixer.init()
 WIDTH = 640
 HEIGHT = 480
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED, vsync=1)
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED|pygame.RESIZABLE, vsync=1)
 
 icon = pygame.image.load("assets/icon.png")
 pygame.display.set_caption("Philooxy's Phishing")
@@ -38,7 +38,7 @@ bobberReel = 0
 waterOffset = 0
 cloudOffset = -730
 cloudOffset2 = -680
-fishCount = 0
+#fishCount = 0
 fishes = []
 linePos = (150, 101)
 isClicking = False
@@ -53,17 +53,27 @@ fishingrect = pygame.Rect(WIDTH/2 - 16 + offsetX, HEIGHT/2 - 16 + 16 + offsetY, 
 sunsetCheck = False
 sunriseCheck = False
 
-with open('save.philooxy', 'r') as f:
-    lines = f.readlines()
-    fishesHeld = json.loads(lines[0])
-    balance = int(lines[1])
-    reelTime = int(lines[2])
-    maxFishes = int(lines[3])
-    fishSpawnCap = int(lines[4])
-    fishScaredRange = int(lines[5])
-    catchTimer = int(lines[6])
-    fishCount = len(fishesHeld)
+def load(data):
+    global fishesHeld, balance, reelTime, maxFishes, fishSpawnCap, fishScaredRange, catchTimer, fishCount
+    with open('.saves/save.philooxy', 'r') as f:
+        lines = f.readlines()
+        if data == "var":
+            fishesHeld = json.loads(lines[0])
+            balance = int(lines[1])
+            reelTime = json.loads(lines[2])[0]
+            maxFishes = json.loads(lines[3])[0]
+            fishSpawnCap = json.loads(lines[4])[0]
+            fishScaredRange = json.loads(lines[5])[0]
+            catchTimer = json.loads(lines[6])[0]
+            fishCount = int(lines[7])
+        elif data == "bought":
+            reeltimeupgrade.shopItem.bought = json.loads(lines[2])[1]
+            hookupgrade.shopItem.bought = json.loads(lines[3])[1]
+            spawncapupgrade.shopItem.bought = json.loads(lines[4])[1]
+            scaredrangeupgrade.shopItem.bought = json.loads(lines[5])[1]
+            catchtimeupgrade.shopItem.bought = json.loads(lines[6])[1]
 
+load("var")
 
 #upgrade related variables
 #reelTime = 60 #how long it takes for you to reel in the fishes
@@ -80,6 +90,7 @@ lowGraphicsMode = False
 
 #stupid
 wideMode = False
+fastSun = False
 
 class button():
     def __init__(self, rect, newarea, image):
@@ -94,6 +105,7 @@ class button():
         global isClicking, area, startTransitionY, startTransitionX, hovering
 
         self.image = pygame.transform.scale(self.image, (self.rect2[2], self.rect2[3]))
+
         if self.rect.collidepoint(pygame.mouse.get_pos()) and (startTransitionY == 100 or startTransitionY == 0) and (startTransitionX == 100 or startTransitionX == 0):
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
             hovering = True
@@ -108,6 +120,8 @@ class button():
         else:
             self.rect2 = pygame.Rect(rect)
             self.rect = self.rect2
+            if pygame.mouse.get_pressed()[0]:
+                isClicking == True
         screen.blit(self.image, self.rect)
 
 class fishy():
@@ -200,7 +214,7 @@ class fishy():
             self.pos = (self.pos[0]+1*self.speed, self.pos[1])
 
         if self.rect.colliderect(fishingrect) and self.caught == False and len(fishCaughtArray) < maxFishes:
-            if not(-30 < self.catchTimer <= 0):
+            if not(-30 < self.catchTimer <= 0) and catchTimer < catchtimeupgrade.cap:
                 self.caught = True
                 #fishesHeld.append(self.type)
                 self.catchTimer = catchTimer + self.catchTime
@@ -256,21 +270,30 @@ class shopItem():
             self.image = pygame.transform.scale(self.image, (self.rect2[2]*1.2, self.rect2[3]*1.2))
 
             self.upgrade = False
+
+            self.cost = self.cost2 + self.costIncrement*self.bought
+
+            if self.increment > 0:
+                self.capCheck = (var+self.increment < self.cap)
+            elif self.increment < 0:
+                self.capCheck = (var+self.increment > self.cap)
+
+            if self.increment > 0:
+                self.capCheck2 = (var < self.cap)
+            elif self.increment < 0:
+                self.capCheck2 = (var > self.cap)
+
             if pygame.mouse.get_pressed()[0] == False and self.isClicking == True:
                 self.isClicking = False
             if pygame.mouse.get_pressed()[0] and self.isClicking == False:
                 if balance - self.cost >= 0:
                     #balance -= self.cost
-                    self.bought += 1
-                    if self.increment > 0:
-                        self.capCheck = (var+self.increment < self.cap)
-                    elif self.increment < 0:
-                        self.capCheck = (var+self.increment > self.cap)
 
-                    if self.capCheck:
+                    if self.capCheck2:
+                        self.bought += 1
+                        print(self.bought)
                         self.upgrade = True
                         balance -= self.cost
-                        self.cost = self.cost2 + self.costIncrement*self.bought
                     self.isClicking = True
 
             desc1 = ut_xs.render(self.desc, False, (0,0,0))
@@ -278,7 +301,7 @@ class shopItem():
             desc1Rect.center = (self.rect2.center[0], self.rect2.center[1] + self.rect2[3]/2 + 10 + 20)
             screen.blit(desc1, desc1Rect)
 
-            if self.capCheck:
+            if self.capCheck2:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
                 if self.increment > 0:
                     self.capCheck2 = var+self.increment > self.cap
@@ -290,14 +313,15 @@ class shopItem():
                 else:
                     var2 = var+self.increment
                 desc2Text = f'{var} -> {var2}'
-            else:
-                desc2Text = f'MAX ({self.cap})'
-                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_NO)
 
-            cost = ut_xs.render(f'Cost: ${self.cost}', False, (0,0,0))
-            costRect = cost.get_rect()
-            costRect.center = (self.rect2.center[0], self.rect2.center[1] + self.rect2[3]/2 + desc1Rect[3]/2 + 20 + 16)
-            screen.blit(cost, costRect)
+                cost = ut_xs.render(f'Cost: ${self.cost}', False, (0,0,0))
+                costRect = cost.get_rect()
+                costRect.center = (self.rect2.center[0], self.rect2.center[1] + self.rect2[3]/2 + desc1Rect[3]/2 + 20 + 16)
+                screen.blit(cost, costRect)
+
+            else:
+                desc2Text = f'MAX ({var})'
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_NO)
 
             desc2 = ut_xs.render(desc2Text, False, (0,0,0))
             desc2Rect = desc2.get_rect()
@@ -328,7 +352,7 @@ class hookUpgrade(shopItem):
         upgrade = self.shopItem.update(maxFishes, rect)
         if upgrade == True:
             maxFishes += self.increment
-        if maxFishes > self.cap:
+        if maxFishes >= self.cap:
             maxFishes = self.cap
 
 
@@ -344,7 +368,7 @@ class spawnCapUpgrade(shopItem):
         upgrade = self.shopItem.update(fishSpawnCap, rect)
         if upgrade == True:
             fishSpawnCap += self.increment
-        if fishSpawnCap > self.cap:
+        if fishSpawnCap >= self.cap:
             fishSpawnCap = self.cap
 
 
@@ -359,7 +383,7 @@ class reelTimeUpgrade(shopItem):
         upgrade = self.shopItem.update(reelTime, rect)
         if upgrade == True:
             reelTime += self.increment
-        if reelTime < self.cap:
+        if reelTime <= self.cap:
             reelTime = self.cap
 
 class scaredRangeUpgrade(shopItem):
@@ -373,7 +397,7 @@ class scaredRangeUpgrade(shopItem):
         upgrade = self.shopItem.update(fishScaredRange, rect)
         if upgrade == True:
             fishScaredRange += self.increment
-        if fishScaredRange < self.cap:
+        if fishScaredRange <= self.cap:
             fishScaredRange = self.cap
 
 class catchTimeUpgrade(shopItem):
@@ -387,15 +411,16 @@ class catchTimeUpgrade(shopItem):
         upgrade = self.shopItem.update(catchTimer, rect)
         if upgrade == True:
             catchTimer += self.increment
-        if catchTimer > self.cap:
+        if catchTimer >= self.cap:
             catchTimer = self.cap
 
 #upgrades
-hookupgrade = hookUpgrade("Hook upgrade", "Increase how much fish you can hold", "assets/hookupgrade.png", (WIDTH/4 - 16, HEIGHT/4, 32, 32), 50, 25, 5, 50)
+hookupgrade = hookUpgrade("Hook upgrade", "Increase how much fish you can hold", "assets/hookupgrade.png", (WIDTH/4 - 16, HEIGHT/4, 32, 32), 50, 25, 3, 50)
 spawncapupgrade = spawnCapUpgrade("Max fish upgrade", "Increase how much fish spawn at a time", "assets/maxfishupgrade.png", (2*WIDTH/4 - 16, HEIGHT/4, 32, 32), 30, 20, 1, 20)
-reeltimeupgrade = reelTimeUpgrade("Reel time upgrade", "Decrease the time to reel in fish", "assets/reelupgrade.png", (3*WIDTH/4 - 16, HEIGHT/4, 32, 32), 25, 15, -10, 10)
-scaredrangeupgrade = scaredRangeUpgrade("Better Lure", "Decrease the area where fish get scared", "assets/scaredrangeupgrade.png", (WIDTH/4 - 16, 2*HEIGHT/4, 32, 32), 55, 5, -8, 16)
-catchtimeupgrade = catchTimeUpgrade("Hook Glue", "Increase time that fish stay on hook", "assets/catchtimeupgrade.png", (2*WIDTH/4 - 16, 2*HEIGHT/4, 32, 32), 40, 10, 10, 120)
+reeltimeupgrade = reelTimeUpgrade("Reel time upgrade", "Decrease the time to reel in fish", "assets/reelupgrade.png", (3*WIDTH/4 - 16, HEIGHT/4, 32, 32), 25, 15, -5, 10)
+scaredrangeupgrade = scaredRangeUpgrade("Better Lure", "Decrease the area where fish get scared", "assets/scaredrangeupgrade.png", (WIDTH/4 - 16, 2*HEIGHT/4, 32, 32), 55, 5, -4, 16)
+catchtimeupgrade = catchTimeUpgrade("Hook Glue", "Increase time that fish stay on hook", "assets/catchtimeupgrade.png", (2*WIDTH/4 - 16, 2*HEIGHT/4, 32, 32), 40, 20, 20, 200)
+load("bought")
 #buttons
 startbutton = button((WIDTH/2 - 50, HEIGHT/2 + 40 - 600 + startTransitionY*6, 100, 40), 1, "assets/fishbutton.png")
 shopbutton = button((WIDTH/2 - 50, HEIGHT/2 + 90 - 600 + startTransitionY*6, 100, 40), 2, "assets/shopbutton.png")
@@ -466,20 +491,21 @@ mus_menu = mus_hotel2
 #functions
 def checkSunset():
 
-    global sunsetCheck, sunriseCheck, hour, minute
+    global sunsetCheck, sunriseCheck, hour, minute, fastSun
 
-    """
-    minute += 1
-    if minute > 60:
-        minute = 1
-        hour += 1
-    if hour > 24:
-        hour = 1
-    """
-    now = datetime.datetime.now()
+    if fastSun:
+        minute += 1
+        if minute > 60:
+            minute = 1
+            hour += 1
+        if hour > 24:
+            hour = 1
 
-    hour = int(now.strftime("%H"))
-    minute = int(now.strftime("%m"))
+    else:
+        now = datetime.datetime.now()
+
+        hour = int(now.strftime("%H"))
+        minute = int(now.strftime("%m"))
 
     sunsetCheck = 19 <= hour <= 24
     sunriseCheck = 1 <= hour <= 6
@@ -513,6 +539,7 @@ def checkSprites():
     dockImage2 = pygame.transform.flip(dockImage, True, False)
     waterImage2 = waterImage
     fisherImage = fisherImage_normal
+
 def checkMusic():
     global sunsetCheck, sunriseCheck, mus_fishing
 
@@ -647,15 +674,26 @@ def bobberMove():
     if pressed_keys[pygame.K_UP] and pressed_keys[pygame.K_DOWN]:
         moving = False
 
+def save():
+    global balance, reelTime, maxFishes, fishSpawnCap, fishScaredRange, catchTimer, fishCount, fishesHeld, reeltimeupgrade
+    print(reeltimeupgrade.shopItem.bought)
+    with open('.saves/save.philooxy', 'w') as f:
+        reelTime = [reelTime, reeltimeupgrade.shopItem.bought]
+        maxFishes = [maxFishes, hookupgrade.shopItem.bought]
+        fishSpawnCap = [fishSpawnCap, spawncapupgrade.shopItem.bought]
+        fishScaredRange = [fishScaredRange, scaredrangeupgrade.shopItem.bought]
+        catchTimer = [catchTimer, catchtimeupgrade.shopItem.bought]
+        lines = [f'{balance}\n', f'{reelTime}\n', f'{maxFishes}\n', f'{fishSpawnCap}\n', f'{fishScaredRange}\n', f'{catchTimer}\n', f'{fishCount}\n']
+        f.write(f'{fishesHeld}\n')
+        f.writelines(lines)
+
+
 def displayscreen(area):
     global bobberFallAnim, fishingMusic, reelAnim, menuMusic, startTransitionY, startTransitionX, offsetX, offsetY, bobberSpeed, bobberFall, bobberReel, exponent, waterOffset, fishCount, fishingrect, fishingrect2, moving, fishes, cloudOffset, cloudOffset2, xmove_temp, ymove_temp, reelTime, linePos, fishSpawnCap, fishCaughtArray, fishesHeld, balance, fisherImage, fishSFX, bobberPos, easingY, easingX, run, sunsetCheck, sunriseCheck, lowGraphicsMode, wideMode
 
     if area == "exit":
         run = False
-        with open('save.philooxy', 'w') as f:
-            lines = [f'{balance} \n', f'{reelTime} \n', f'{maxFishes} \n', f'{fishSpawnCap} \n', f'{fishScaredRange} \n', f'{catchTimer} \n',]
-            f.write(f'{fishesHeld}\n')
-            f.writelines(lines)
+        save()
 
     if area == "sell":
         for i in fishesHeld:
@@ -907,7 +945,8 @@ run = True
 while run:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            sys.exit()
+            run = False
+            save()
 
     screen.fill((255,255,255))
 
