@@ -1,59 +1,11 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame, sys, random, math, time, datetime, json
+from setupvars import *
 
 pygame.init()
 pygame.font.init()
 pygame.mixer.init()
-WIDTH = 640
-HEIGHT = 480
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED|pygame.RESIZABLE, vsync=1)
-
-icon = pygame.image.load("assets/icon.png")
-pygame.display.set_caption("Philooxy's Phishing")
-pygame.display.set_icon(icon)
-pygame.mixer.init()
-clock = pygame.time.Clock()
-arial = pygame.font.SysFont('arial', 20)
-ut = pygame.font.Font('assets/font.ttf', 20)
-ut_s = pygame.font.Font('assets/font.ttf', 15)
-ut_xs = pygame.font.Font('assets/font.ttf', 12)
-pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-
-# flags
-bobberFallAnim = False #bobber falling animation at start of fishing
-fishingMusic = False #music only starts once on fishing area
-reelAnim = False #reeling in animation
-menuMusic = False #music only starts once on title screen
-
-#not flags
-startTransitionY = 0 #transition between menu and start
-startTransitionX = 100 #same thing but horizontal
-sunMove = 0
-
-area = "title"
-offsetX, offsetY = -169, -129
-
-bobberSpeed = 2
-bobberFall = 0
-bobberReel = 0
-waterOffset = 0
-cloudOffset = -730
-cloudOffset2 = -680
-#fishCount = 0
-fishes = []
-linePos = (150, 101)
-isClicking = False
-#fishesHeld = []
-fishCaughtArray = []
-#balance = 0
-easingY = 0
-easingX = 0
-bobberPos = (136, 100)
-hovering = False
-fishingrect = pygame.Rect(WIDTH/2 - 16 + offsetX, HEIGHT/2 - 16 + 16 + offsetY, 32, 32)
-sunsetCheck = False
-sunriseCheck = False
 
 def load(data):
     global fishesHeld, balance, reelTime, maxFishes, fishSpawnCap, fishScaredRange, catchTimer, fishCount
@@ -77,63 +29,91 @@ def load(data):
 
 load("var")
 
-#upgrade related variables
-#reelTime = 60 #how long it takes for you to reel in the fishes
-#maxFishes = 3 #how much fishes you can hold at a time
-#fishSpawnCap = 5 #how many fishes can spawn
-#fishScaredRange = 48 #how close you can get to a fish without it getting scared
-#catchTimer = 70 #how long you can hold a fish before it escapes 
-upgrade = False
+#i have no idea what to name this
+def buttonCheck(rect, image):
+    global startTransitionY, startTransitionX, hovering
+    check = False
+    image = pygame.transform.scale(image, (rect[2], rect[3]))
+    if rect.collidepoint(pygame.mouse.get_pos()):
+        hovering = True
+        match startTransitionY:
+            case 0 | 100 | 200:
+                match startTransitionX:
+                    case 0 | 100 | 200:
+                        check = True
+    if check:
+        image = pygame.transform.scale(image, (rect[2]*1.2, rect[3]*1.2))
+        rect = rect.inflate(rect[2]*0.2, rect[3]*0.2)
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+    return rect, image, check
 
-#settings variables
-volume = 1 #volume
-fishSFX = False#if you want the annoying fish sound that plays every time a fish spawns
-lowGraphicsMode = False
-theme = 0
+def checkClick():
+    global isClicking
+    click = False
+    if pygame.mouse.get_pressed()[0] == False and isClicking == True:
+        isClicking = False
+    if pygame.mouse.get_pressed()[0]:
+        if isClicking == False:
+            click = True
+        isClicking = True
+    return click
 
-#stupid
-wideMode = False #wide sode
-fastSun = False #this is for testing but you can turn it on if you want
+def updateButton(baseRect, image):
+    update = False
+    image = pygame.transform.scale(image, (baseRect[2], baseRect[3]))
+    check = False
+
+    rect, image, check = buttonCheck(baseRect, image)
+
+    if check:
+        click = checkClick()
+        if click:
+            update = True
+
+    screen.blit(image, rect)
+
+    return update
 
 class button():
-    def __init__(self, rect, newarea, image):
-        global startTransitionY
-        self.clicked = False
+    def __init__(self, newarea, image):
         self.image = pygame.image.load(image)
-        self.rect2 = pygame.Rect(rect)
         self.newarea = newarea
-        self.rect = self.rect2
 
     def update(self, rect):
-        global isClicking, area, startTransitionY, startTransitionX, hovering
+        global area
+        update = updateButton(pygame.Rect(rect), self.image)
+        if update:
+            area = self.newarea
 
-        check = False
-
-        self.image = pygame.transform.scale(self.image, (self.rect2[2], self.rect2[3]))
-
-        if self.rect.collidepoint(pygame.mouse.get_pos()):
-            match startTransitionY:
-                case 0 | 100 | 200:
-                    match startTransitionX:
-                        case 0 | 100 | 200:
-                            check = True
-        if check:
-            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
-            hovering = True
-            self.rect = pygame.Rect((self.rect2[0]-(self.rect2[2]*0.1), self.rect2[1]-(self.rect2[3]*0.1), self.rect2[2]*1.2, self.rect2[3]*1.2))
-            self.image = pygame.transform.scale(self.image, (self.rect2[2]*1.2, self.rect2[3]*1.2))
-            if pygame.mouse.get_pressed()[0] == False and isClicking == True:
-                isClicking = False
-            if pygame.mouse.get_pressed()[0]:
-                if isClicking == False:
-                    area = self.newarea
-                isClicking = True
+class toggleButton():
+    def __init__(self, var):
+        self.image_on = pygame.image.load("assets/toggle_on.png")
+        self.image_off = pygame.image.load("assets/toggle_off.png")
+        if var:
+            self.var = True
         else:
-            self.rect2 = pygame.Rect(rect)
-            self.rect = self.rect2
-            if pygame.mouse.get_pressed()[0]:
-                isClicking == True
-        screen.blit(self.image, self.rect)
+            self.var = False
+    def update(self, var, rect):
+        toggle = False
+        if var:
+            self.image = self.image_on
+        else:
+            self.image = self.image_off
+        update = updateButton(pygame.Rect(rect), self.image)
+        if update:
+            toggle = True
+        if toggle:
+            if self.var:
+                self.var = False
+            else:
+                self.var = True
+        return self.var
+
+fishSFX_toggle = toggleButton(fishSFX)
+fullscreen_toggle = toggleButton(fullscreen)
+wideMode_toggle = toggleButton(wideMode)
+fastSun_toggle = toggleButton(fastSun)
+lowGraphicsMode_toggle = toggleButton(lowGraphicsMode)
 
 class fishy():
     def __init__(self):
@@ -183,8 +163,6 @@ class fishy():
             self.image = pygame.transform.flip(self.image, True, False)
         if self.caught == True:
             self.image = pygame.transform.rotate(self.image, self.rotate)
-            #self.rect = self.image.get_rect()
-            #self.rect = pygame.Rect(WIDTH/2 - 16 + self.pos[0], HEIGHT/2 - 16 + self.pos[1], self.rect[2], self.rect[3])
 
         if self.pos[0] < -180:
             self.dir = 1
@@ -213,7 +191,6 @@ class fishy():
                 self.caught = False
 
             if self.catchTimer == 0:
-                #fishesHeld.remove(self.type)
                 fishCaughtArray.remove(self)
                 self.pos = (self.pos[0], self.pos[1]+(16+-64*random.randint(0,1)))
                 if self.pos[1] < 20:
@@ -227,16 +204,12 @@ class fishy():
         if self.rect.colliderect(fishingrect) and self.caught == False and len(fishCaughtArray) < maxFishes:
             if not(-30 < self.catchTimer <= 0) and catchTimer < catchtimeupgrade.cap:
                 self.caught = True
-                #fishesHeld.append(self.type)
                 self.catchTimer = catchTimer + self.catchTime
                 fishCaughtArray.append(self)
-
 
         if self.caught == True:
             self.pos = (offsetX, offsetY+24+11)
             if offsetY <= 0 and offsetX < -20 and bobberFallAnim == False:
-                #self.caught = False
-                #fishes.remove(self)
                 reelAnim = True
 
         if self.pos[0] > 320 or self.pos[0] < -320 or ((self.pos[1] > 200) and self.caught == False) or 0 < startTransitionY < 100:
@@ -244,18 +217,13 @@ class fishy():
 
         self.rect[0], self.rect[1] = WIDTH/2 - 16 + self.pos[0], HEIGHT/2 - 16 + self.pos[1]
 
-        #pygame.draw.rect(screen, (255, 0, 0), self.rect)
-
         screen.blit(self.image, self.rect)
 
 #basic upgrade item
 class shopItem():
     def __init__(self, name, desc, image, rect, cost, costIncrement, increment, cap):
-        #global isClicking
         self.image = pygame.image.load(image)
         self.imagepath = image
-        self.rect2 = pygame.Rect(rect)
-        self.rect = self.rect2
         self.cost = cost
         self.cost2 = cost
         self.costIncrement = costIncrement
@@ -272,15 +240,13 @@ class shopItem():
     def update(self, var, rect):
         global balance, hovering, startTransitionY, startTransitionX
 
-        self.rect2 = pygame.Rect(rect)
+        check = False
+        click = False
+        self.upgrade = False
 
-        self.image = pygame.transform.scale(self.image, (self.rect2[2], self.rect2[3]))
-        if self.rect.collidepoint(pygame.mouse.get_pos()) and (startTransitionY == 100 or startTransitionY == 0) and (startTransitionX == 100 or startTransitionX == 0) and pygame.mouse.get_focused():
-            hovering = True
-            self.rect = self.rect2.inflate(self.rect2[2]*0.2, self.rect2[3]*0.2)
-            self.image = pygame.transform.scale(self.image, (self.rect2[2]*1.2, self.rect2[3]*1.2))
+        self.rect, self.image, check = buttonCheck(pygame.Rect(rect), self.image)
 
-            self.upgrade = False
+        if check:
 
             self.cost = self.cost2 + self.costIncrement*self.bought
 
@@ -294,21 +260,17 @@ class shopItem():
             elif self.increment < 0:
                 self.capCheck2 = (var > self.cap)
 
-            if pygame.mouse.get_pressed()[0] == False and self.isClicking == True:
-                self.isClicking = False
-            if pygame.mouse.get_pressed()[0] and self.isClicking == False:
+            click = checkClick()
+            if click:
                 if balance - self.cost >= 0:
-                    #balance -= self.cost
 
                     if self.capCheck2:
                         self.bought += 1
                         self.upgrade = True
                         balance -= self.cost
-                    self.isClicking = True
 
-            desc1 = ut_xs.render(self.desc, False, (0,0,0))
-            desc1Rect = desc1.get_rect()
-            desc1Rect.center = (self.rect2.center[0], self.rect2.center[1] + self.rect2[3]/2 + 10 + 20)
+            desc1, desc1Rect = renderText(self.desc, ut_xs)
+            desc1Rect.center = (self.rect.center[0], self.rect.center[1] + self.rect[3]/2 + 10 + 20)
             screen.blit(desc1, desc1Rect)
 
             if self.capCheck2:
@@ -324,28 +286,23 @@ class shopItem():
                     var2 = var+self.increment
                 desc2Text = f'{var} -> {var2}'
 
-                cost = ut_xs.render(f'Cost: ${self.cost}', False, (0,0,0))
-                costRect = cost.get_rect()
-                costRect.center = (self.rect2.center[0], self.rect2.center[1] + self.rect2[3]/2 + desc1Rect[3]/2 + 20 + 16)
+                cost, costRect = renderText(f'Cost: ${self.cost}', ut_xs)
+                costRect.center = (self.rect.center[0], self.rect.center[1] + self.rect[3]/2 + desc1Rect[3]/2 + 20 + 16)
                 screen.blit(cost, costRect)
 
             else:
                 desc2Text = f'MAX ({var})'
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_NO)
 
-            desc2 = ut_xs.render(desc2Text, False, (0,0,0))
-            desc2Rect = desc2.get_rect()
-            desc2Rect.center = (self.rect2.center[0], self.rect2.center[1] + self.rect2[3]/2 + desc1Rect[3]/2 + 20 + 30)
+            desc2, desc2Rect = renderText(desc2Text, ut_xs)
+            desc2Rect.center = (self.rect.center[0], self.rect.center[1] + self.rect[3]/2 + desc1Rect[3]/2 + 20 + 30)
             screen.blit(desc2, desc2Rect)
-        else:
-            self.rect = pygame.Rect(self.rect2)
 
-        name = ut_s.render(self.name, False, (0,0,0))
-        nameRect = name.get_rect()
+        name, nameRect = renderText(self.name, ut_s)
         nameRect.center = (self.rect.center[0], self.rect.bottom + 10)
         screen.blit(name, nameRect)
 
-        screen.blit(self.image, (self.rect[0], self.rect[1]))
+        screen.blit(self.image, self.rect)
 
         return self.upgrade
 
@@ -432,74 +389,15 @@ scaredrangeupgrade = scaredRangeUpgrade("Better lure", "Decrease the area where 
 catchtimeupgrade = catchTimeUpgrade("Hook glue", "Increase time that fish stay on hook", "assets/catchtimeupgrade.png", (2*WIDTH/4 - 16, 2*HEIGHT/4, 32, 32), 40, 20, 20, 200)
 load("bought")
 #buttons
-startbutton = button((WIDTH/2 - 50, HEIGHT/2 + 40 - 600 + startTransitionY*6, 100, 40), "fishing", "assets/fishbutton.png")
-shopbutton = button((WIDTH/2 - 50, HEIGHT/2 + 90 - 600 + startTransitionY*6, 100, 40), "shop", "assets/shopbutton.png")
-settingsbutton = button((WIDTH/2 - 50, HEIGHT/2 + 140 - 600 + startTransitionY * 6, 100, 40), "settings", "assets/settingsbutton.png")
-exitbutton = button((WIDTH/2 - 50, HEIGHT/2 + 190 - 600 + startTransitionY*6, 100, 40), "exit", "assets/exitbutton.png")
-sellbutton = button((20, HEIGHT-20, 100, 40), "sell", "assets/sellfishbutton.png")
+startbutton = button("fishing", "assets/fishbutton.png")
+shopbutton = button("shop", "assets/shopbutton.png")
+settingsbutton = button("settings", "assets/settingsbutton.png")
+exitbutton = button("exit", "assets/exitbutton.png")
+sellbutton = button("sell", "assets/sellfishbutton.png")
 
-homebutton = button((30, 20, 100, 40), "title", "assets/homebutton.png")
-homebutton_up = button((20, 20, 100, 40), "title", "assets/homebutton-up.png")
-homebutton_right = button((20, 20, 100, 40), "title", "assets/homebutton-right.png")
-
-#images
-#sunset/sunrise images
-cloudsImage2_sunset = pygame.image.load("assets/clouds2-sunset.png")
-cloudsImage_sunset = pygame.image.load("assets/clouds1-sunset.png")
-fisherImage_normal_sunset = pygame.image.load("assets/fisher-sunset.png")
-fisherImage_pull_sunset = pygame.image.load("assets/fisherpull.png")
-dockImage_sunset = pygame.image.load("assets/dock-sunset.png")
-skyColor_sunset = (4, 99, 171)
-waterImage_sunset = pygame.image.load("assets/water-sunset.png")
-sunImage_sunset = pygame.image.load("assets/sun-sunset-full.png")
-bobberImage_sunset = pygame.image.load("assets/bobber-sunset.png")
-titleImage_sunset = pygame.image.load("assets/title-sunset.png")
-#normal images
-cloudsImage2_noon = pygame.image.load("assets/clouds2-noon.png")
-cloudsImage_noon = pygame.image.load("assets/clouds1-noon.png")
-fisherImage_normal_noon = pygame.image.load("assets/fisher-noon.png")
-fisherImage_pull_noon = pygame.image.load("assets/fisherpull.png")
-dockImage_noon = pygame.image.load("assets/dock-noon.png")
-skyColor_noon = (0, 175, 229)
-waterImage_noon = pygame.image.load("assets/water-noon.png")
-sunImage_noon = pygame.image.load("assets/sun-noon.png")
-bobberImage_noon = pygame.image.load("assets/bobber-noon.png")
-titleImage_noon = pygame.image.load("assets/title-noon.png")
-
-cloudsImage2 = cloudsImage2_noon
-cloudsImage = cloudsImage_noon
-fisherImage_normal = fisherImage_normal_noon
-fisherImage_pull = fisherImage_pull_noon
-dockImage = dockImage_noon
-skyColor = skyColor_noon
-waterImage = waterImage_noon
-sunImage = sunImage_noon
-bobberImage = bobberImage_noon
-titleImage = titleImage_noon
-
-dockImage2 = pygame.transform.flip(dockImage, True, False)
-waterImage2 = waterImage
-fisherImage = fisherImage_normal
-
-if wideMode:
-    fisherImage_normal_noon = pygame.transform.scale_by(fisherImage_normal_noon, (4, 1))
-    fisherImage_normal_sunset = pygame.transform.scale_by(fisherImage_normal_noon, (4, 1))
-    fisherImage_pull_noon = pygame.transform.scale_by(fisherImage_normal_noon, (4, 1))
-    fisherImage_pull_sunset = pygame.transform.scale_by(fisherImage_normal_noon, (4, 1))
-    if lowGraphicsMode:
-        fisherImage_normal = fisherImage_normal_noon
-        fisherImage_pull = fisherImage_pull_noon
-
-#sounds
-ykwtm = pygame.mixer.Sound("assets/fish.mp3")
-
-#music
-mus_hotel2 = pygame.mixer.Sound("assets/hotel2.mp3")
-mus_paradise = pygame.mixer.Sound("assets/paradise.mp3")
-mus_menu = mus_hotel2
-
-if fastSun:
-    hour, minute, = 1, 1
+homebutton = button("title", "assets/homebutton.png")
+homebutton_up = button("title", "assets/homebutton-up.png")
+homebutton_right = button("title", "assets/homebutton-right.png")
 
 #functions
 def checkSunset():
@@ -511,8 +409,8 @@ def checkSunset():
         if minute > 60:
             minute = 1
             hour += 1
-        if hour > 24:
-            hour = 1
+        if hour > 23:
+            hour = 0
 
     else:
         now = datetime.datetime.now()
@@ -526,8 +424,8 @@ def checkSunset():
     if theme == 1:
         hour = 12
         minute = 0
-    sunsetCheck = 19 <= hour <= 24
-    sunriseCheck = 1 <= hour <= 7
+    sunsetCheck = 19 <= hour <= 23
+    sunriseCheck = 0 <= hour <= 7
 
 def checkSprites():
     global sunsetCheck, cloudsImage2, cloudsImage, fisherImage_normal, fisherImage_pull, fisherImage, dockImage, dockImage2, skyColor, waterImage, waterImage2, sunImage, bobberImage, titleImage
@@ -574,36 +472,37 @@ checkMusic()
 if sunsetCheck or sunriseCheck:
     mus_menu.play(loops=-1)
 
+#Thank you to my friend for teaching me how to ease
 def ease(t):
     return 1 - ((1 - t) ** 9)
 
 prevMin = minute
-if 1 <= hour <= 11:
+if 0 <= hour <= 11:
     sunLerp = 1-(hour/11)+(minute/60)/11
-if 12 <= hour <= 14:
+    print("a")
+elif 12 <= hour <= 14:
     sunLerp = 0
-if 15 <= hour <= 24:
+    print("b")
+elif 15 <= hour <= 23:
     sunLerp = ((hour-14)/11)+(minute/60)/11
-
+    print("c")
 
 def drawbg():
     global cloudOffset, cloudOffset2, waterOffset, startTransitionY, skyColor, fishes, bobberPos, sunsetCheck, fishingrect, linePos, sunMove, sunsetCheck, sunriseCheck, sunLerp, prevMin, minute, hour, lowGraphicsMode, wideMode
 
-    if lowGraphicsMode == False:
-        checkSunset()
+    checkSunset()
 
-        checkMusic()
+    checkMusic()
 
-        checkSprites()
+    checkSprites()
 
     screen.fill(skyColor)
 
-    if lowGraphicsMode == False:
-        if minute != prevMin:
-            if 1 <= hour <= 11:
-                sunLerp -= 1/660
-            if 14 <= hour <= 24:
-                sunLerp += 1/660
+    if minute != prevMin:
+        if 0 <= hour <= 11:
+            sunLerp -= 1/660
+        if 14 <= hour <= 23:
+            sunLerp += 1/660
 
         prevMin = minute
 
@@ -659,6 +558,7 @@ def drawShop():
     sellbutton.update((30-startTransitionX*6, HEIGHT - 60, 100, 40))
 
 def drawFishing():
+    global wideMode, fisherImage_wide
     screen.blit(dockImage, (-2, startTransitionY*6-100))
     screen.blit(dockImage2, (WIDTH - 158, startTransitionY*6-100))
 
@@ -666,10 +566,13 @@ def drawFishing():
     if reelAnim and not(wideMode):
         fisherImage = fisherImage_pull
 
+    if wideMode:
+        fisherImage = fisherImage_wide
+
     if not(wideMode):
         screen.blit(fisherImage, (0, startTransitionY*6-100))
     else:
-        screen.blit(fisherImage, (-300, startTransitionY*6-100))
+        screen.blit(fisherImage, (-100, startTransitionY*6-100))
 
     bobberPos = (fishingrect[0], fishingrect[1]-11+startTransitionY*6)
     pygame.draw.line(screen, (0,0,0), linePos, (bobberPos[0]+15, bobberPos[1]), width=2)
@@ -677,8 +580,53 @@ def drawFishing():
 
     homebutton_up.update((20, 20+startTransitionY*6, 100, 40))
 
+def drawSetting(text, coords, var, var_toggle):
+    settings, settingsRect = renderText(text, ut)
+    settingsRect.topright = coords
+    screen.blit(settings, settingsRect)
+
+    var = var_toggle.update(var, (coords[0]+10, coords[1]-2, 32, 32))
+    
+    return var
+
 def drawSettings():
-    homebutton.update((1230-startTransitionX*6, 20, 100, 40))
+    global startTransitionX, fullscreen, wideMode, lowGraphicsMode, fishSFX, fastSun
+    tempOffsetX = 1200-startTransitionX*6
+
+    settings, settingsRect = renderText("Main Settings", ut_b)
+    settingsRect.topright = (WIDTH+tempOffsetX-82, 50)
+    screen.blit(settings, settingsRect)
+
+    fullscreen = drawSetting("Fullscreen:", (WIDTH+tempOffsetX-82, 100), fullscreen, fullscreen_toggle)
+
+    lowGraphicsMode = drawSetting("Low Graphics Mode:", (WIDTH+tempOffsetX-82, 140), lowGraphicsMode, lowGraphicsMode_toggle)
+
+    settings, settingsRect = renderText("silly settings", ut_b)
+    settingsRect.topright = (WIDTH+tempOffsetX-82, 300)
+    screen.blit(settings, settingsRect)
+
+    wideMode = drawSetting("W I D E M O D E :", (WIDTH+tempOffsetX-82, 350), wideMode, wideMode_toggle)
+
+    fishSFX = drawSetting("fish spawn sfx:", (WIDTH+tempOffsetX-82, 390), fishSFX, fishSFX_toggle)
+
+    fastSun = drawSetting("weird sun:", (WIDTH+tempOffsetX-82, 430), fastSun, fastSun_toggle)
+
+    if wideMode:
+        fisherImage_normal = fisherImage_wide
+
+    homebutton.update((30+tempOffsetX, 20, 100, 40))
+
+def save():
+    global balance, reelTime, maxFishes, fishSpawnCap, fishScaredRange, catchTimer, fishCount, fishesHeld, reeltimeupgrade
+    with open('.saves/save.philooxy', 'w') as f:
+        reelTime = [reelTime, reeltimeupgrade.shopItem.bought]
+        maxFishes = [maxFishes, hookupgrade.shopItem.bought]
+        fishSpawnCap = [fishSpawnCap, spawncapupgrade.shopItem.bought]
+        fishScaredRange = [fishScaredRange, scaredrangeupgrade.shopItem.bought]
+        catchTimer = [catchTimer, catchtimeupgrade.shopItem.bought]
+        lines = [f'{balance}\n', f'{reelTime}\n', f'{maxFishes}\n', f'{fishSpawnCap}\n', f'{fishScaredRange}\n', f'{catchTimer}\n', f'{fishCount}\n']
+        f.write(f'{fishesHeld}\n')
+        f.writelines(lines)
 
 def bobberMove():
     global moving, offsetX, offsetY, bobberSpeed
@@ -701,18 +649,6 @@ def bobberMove():
         moving = False
     if pressed_keys[pygame.K_UP] and pressed_keys[pygame.K_DOWN]:
         moving = False
-
-def save():
-    global balance, reelTime, maxFishes, fishSpawnCap, fishScaredRange, catchTimer, fishCount, fishesHeld, reeltimeupgrade
-    with open('.saves/save.philooxy', 'w') as f:
-        reelTime = [reelTime, reeltimeupgrade.shopItem.bought]
-        maxFishes = [maxFishes, hookupgrade.shopItem.bought]
-        fishSpawnCap = [fishSpawnCap, spawncapupgrade.shopItem.bought]
-        fishScaredRange = [fishScaredRange, scaredrangeupgrade.shopItem.bought]
-        catchTimer = [catchTimer, catchtimeupgrade.shopItem.bought]
-        lines = [f'{balance}\n', f'{reelTime}\n', f'{maxFishes}\n', f'{fishSpawnCap}\n', f'{fishScaredRange}\n', f'{catchTimer}\n', f'{fishCount}\n']
-        f.write(f'{fishesHeld}\n')
-        f.writelines(lines)
 
 def doReelAnim():
     global reelTime, fishCaughtArray, linePos, bobberFall, bobberReel, xmove_temp, ymove_temp, offsetX, offsetY, fishCount, fishes, bobberFallAnim, reelAnim
@@ -758,8 +694,14 @@ def doCastAnim():
         offsetY = 0
         bobberFallAnim = False
 
+def renderText(text, font):
+    text = font.render(text, False, (0,0,0))
+    rect = text.get_rect()
+
+    return text,rect
+
 def main(area):
-    global bobberFallAnim, fishingMusic, reelAnim, menuMusic, startTransitionY, startTransitionX, offsetX, offsetY, bobberSpeed, bobberFall, bobberReel, exponent, waterOffset, fishCount, fishingrect, fishingrect2, moving, fishes, cloudOffset, cloudOffset2, reelTime, linePos, fishSpawnCap, fishCaughtArray, fishesHeld, balance, fisherImage, fishSFX, bobberPos, easingY, easingX, run, sunsetCheck, sunriseCheck, lowGraphicsMode, wideMode
+    global bobberFallAnim, fishingMusic, reelAnim, menuMusic, startTransitionY, startTransitionX, offsetX, offsetY, bobberSpeed, bobberFall, bobberReel, exponent, waterOffset, fishCount, fishingrect, fishingrect2, moving, fishes, cloudOffset, cloudOffset2, reelTime, linePos, fishSpawnCap, fishCaughtArray, fishesHeld, balance, fisherImage, fishSFX, bobberPos, easingY, easingX, run, sunsetCheck, sunriseCheck, lowGraphicsMode, wideMode, fullscreen
 
     if area == "exit":
         run = False
@@ -901,14 +843,12 @@ def main(area):
                     if fishSFX == True:
                         ykwtm.play()
                     fish = fishy()
-
-            fishCounter = ut.render(f'Fish Caught: {fishCount}', False, (0,0,0))
-            fishCounterRect = fishCounter.get_rect()
+            
+            fishCounter, fishCounterRect = renderText(f'Fish Caught: {fishCount}', ut)
             fishCounterRect.topright = (WIDTH - 20, 20)
             screen.blit(fishCounter, fishCounterRect)
 
-            fishesHelder = ut.render(f'Fish Held: {len(fishCaughtArray)}/{maxFishes}', False, (0,0,0))
-            fishesHelderRect = fishesHelder.get_rect()
+            fishesHelder, fishesHelderRect = renderText(f'Fish Held: {len(fishCaughtArray)}/{maxFishes}', ut)
             fishesHelderRect.bottomright = (WIDTH - 20, HEIGHT - 20)
             screen.blit(fishesHelder, fishesHelderRect)
 
@@ -933,13 +873,11 @@ def main(area):
             easingX += 0.01
         if startTransitionX == 0:
 
-            fishCounter = ut.render(f'Fish: {len(fishesHeld)}', False, (0,0,0))
-            fishCounterRect = fishCounter.get_rect()
+            fishCounter, fishCounterRect = renderText(f'Fish: {len(fishesHeld)}', ut)
             fishCounterRect.topright = (WIDTH - 20, 20)
             screen.blit(fishCounter, fishCounterRect)
 
-            balanceCounter = ut.render(f'Balance: ${balance}', False, (0,0,0))
-            balanceCounterRect = balanceCounter.get_rect()
+            balanceCounter, balanceCounterRect = renderText(f'Balance: ${balance}', ut)
             balanceCounterRect.topright = (WIDTH - 20, 60)
             screen.blit(balanceCounter, balanceCounterRect)
 
@@ -968,12 +906,13 @@ def main(area):
             easingX = 0
 
 
+
 def update():
     pressed_keys = pygame.key.get_pressed()
 
     clock.tick(60)
 
-    if pressed_keys[pygame.K_F11] or pressed_keys[pygame.K_f]:
+    if fullscreen != pygame.display.is_fullscreen():
         pygame.display.toggle_fullscreen()
 
     pygame.display.flip()
@@ -985,6 +924,8 @@ while run:
         if event.type == pygame.QUIT:
             run = False
             save()
+
+    pygame.mixer.music.set_volume(volume)
 
     screen.fill((255,255,255))
 
