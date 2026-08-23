@@ -6,12 +6,6 @@ from setupvars import *
 
 RPC = Presence(1541135004078309517)
 RPC.connect()
-RPC.update(
-    state="philoxy.github.io",
-    details="Game by Philooxy",
-    name="Philooxy's Phishing",
-)
-
 pygame.init()
 pygame.font.init()
 pygame.mixer.init()
@@ -758,6 +752,13 @@ def main(area):
             if sunsetCheck or sunriseCheck:
                 fishingMusic = True
 
+            
+            RPC.update(
+                state="In Menus",
+                details=f'Balance: ${balance}',
+                name="Philooxy's Phishing",
+            )
+
         drawbg()
 
         if lowGraphicsMode == True:
@@ -821,6 +822,12 @@ def main(area):
                 menuMusic = False
             if sunsetCheck or sunriseCheck:
                 menuMusic = True
+
+            RPC.update(
+                state="Fishing",
+                details=f'Total Fish Caught: {fishCount}',
+                name="Philooxy's Phishing",
+            )
 
         if reelAnim == True and startTransitionY == 0.0:
             doReelAnim()
