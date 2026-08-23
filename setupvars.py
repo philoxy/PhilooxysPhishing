@@ -23,7 +23,8 @@ pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 bobberFallAnim = False #bobber falling animation at start of fishing
 fishingMusic = False #music only starts once on fishing area
 reelAnim = False #reeling in animation
-menuMusic = False #music only starts once on title screen
+menuMusic = False #music only starts once on title 
+startAnim = True
 
 #not flags
 startTransitionY = 0 #transition between menu and start
@@ -41,7 +42,7 @@ cloudOffset = -730
 cloudOffset2 = -680
 fishes = []
 linePos = (150, 101)
-isClicking = False
+isClicking = True
 fishCaughtArray = []
 easingY = 0
 easingX = 0
@@ -53,7 +54,7 @@ sunriseCheck = False
 upgrade = False
 
 #settings variables
-volume = 0 #volume
+volume = 1 #volume
 lowGraphicsMode = False
 theme = 0
 
