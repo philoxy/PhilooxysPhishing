@@ -7,7 +7,7 @@ pygame.font.init()
 WIDTH = 640
 HEIGHT = 480
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED|pygame.RESIZABLE, vsync=1)
-icon = pygame.image.load("assets/icon.png")
+icon = pygame.image.load("assets/ui/icon.png").convert_alpha()
 pygame.display.set_caption("Philooxy's Phishing")
 pygame.display.set_icon(icon)
 pygame.mixer.init()
@@ -51,6 +51,7 @@ hovering = False
 fishingrect = pygame.Rect(WIDTH/2 - 16 + offsetX, HEIGHT/2 - 16 + 16 + offsetY, 32, 32)
 sunsetCheck = False
 sunriseCheck = False
+nightCheck = False
 upgrade = False
 achs = []
 achs_unlocked = []
@@ -69,29 +70,50 @@ fastSun = False #this is for testing but you can turn it on if you want
 if fastSun:
     hour, minute, = 1, 1
 
+def loadify(img):
+    return pygame.image.load(img).convert_alpha()
+
 #images
 #sunset/sunrise images
-cloudsImage2_sunset = pygame.image.load("assets/clouds2-sunset.png")
-cloudsImage_sunset = pygame.image.load("assets/clouds1-sunset.png")
-fisherImage_normal_sunset = pygame.image.load("assets/fisher-sunset.png")
-fisherImage_pull_sunset = pygame.image.load("assets/fisherpull.png")
-dockImage_sunset = pygame.image.load("assets/dock-sunset.png")
+cloudsImage2_sunset = loadify("assets/bg/clouds2-sunset.png")
+cloudsImage_sunset = loadify("assets/bg/clouds1-sunset.png")
+fisherImage_normal_sunset = loadify("assets/fisher/fisher-sunset.png")
+fisherImage_pull_sunset = loadify("assets/fisher/fisherpull-sunset.png")
+dockImage_sunset = loadify("assets/bg/dock-sunset.png")
 skyColor_sunset = (4, 99, 171)
-waterImage_sunset = pygame.image.load("assets/water-sunset.png")
-sunImage_sunset = pygame.image.load("assets/sun-sunset-full.png")
-bobberImage_sunset = pygame.image.load("assets/bobber-sunset.png")
-titleImage_sunset = pygame.image.load("assets/title-sunset.png")
+waterImage_sunset = loadify("assets/bg/water-sunset.png")
+sunImage_sunset = loadify("assets/bg/sun-sunset-full.png")
+bobberImage_sunset = loadify("assets/fisher/bobber-sunset.png")
+titleImage_sunset = loadify("assets/bg/title-sunset.png")
 #normal images
-cloudsImage2_noon = pygame.image.load("assets/clouds2-noon.png")
-cloudsImage_noon = pygame.image.load("assets/clouds1-noon.png")
-fisherImage_normal_noon = pygame.image.load("assets/fisher-noon.png")
-fisherImage_pull_noon = pygame.image.load("assets/fisherpull.png")
-dockImage_noon = pygame.image.load("assets/dock-noon.png")
+cloudsImage2_noon = loadify("assets/bg/clouds2-noon.png")
+cloudsImage_noon = loadify("assets/bg/clouds1-noon.png")
+fisherImage_normal_noon = loadify("assets/fisher/fisher-noon.png")
+fisherImage_pull_noon = loadify("assets/fisher/fisherpull.png")
+dockImage_noon = loadify("assets/bg/dock-noon.png")
 skyColor_noon = (0, 175, 229)
-waterImage_noon = pygame.image.load("assets/water-noon.png")
-sunImage_noon = pygame.image.load("assets/sun-noon.png")
-bobberImage_noon = pygame.image.load("assets/bobber-noon.png")
-titleImage_noon = pygame.image.load("assets/title-noon.png")
+waterImage_noon = loadify("assets/bg/water-noon.png")
+sunImage_noon = loadify("assets/bg/sun-noon.png")
+bobberImage_noon = loadify("assets/fisher/bobber-noon.png")
+titleImage_noon = loadify("assets/bg/title-noon.png")
+#night images
+cloudsImage2_night = loadify("assets/bg/clouds2-night.png")
+cloudsImage_night = loadify("assets/bg/clouds1-night.png")
+fisherImage_normal_night = loadify("assets/fisher/fisher-night.png")
+fisherImage_pull_night = loadify("assets/fisher/fisherpull-night.png")
+dockImage_night = loadify("assets/bg/dock-night.png")
+skyColor_night = (11, 20, 119)
+waterImage_night = loadify("assets/bg/water-night.png")
+sunImage_night = loadify("assets/bg/sun-noon.png")
+bobberImage_night = loadify("assets/fisher/bobber-sunset.png")
+titleImage_night = loadify("assets/bg/title-night.png")
+stars = loadify("assets/bg/stars.png")
+#other images
+slider_bar = loadify("assets/ui/slider.png")
+slider_ball = loadify("assets/ui/slider2.png")
+toggle_on = loadify("assets/ui/toggle_on.png")
+toggle_off = loadify("assets/ui/toggle_off.png")
+ach_bg = loadify("assets/achs/bg.png")
 
 fisherImage_wide = pygame.transform.scale_by(fisherImage_normal_noon, (2.5, 1))
 
@@ -111,9 +133,9 @@ waterImage2 = waterImage
 fisherImage = fisherImage_normal
 
 #sounds
-ykwtm = pygame.mixer.Sound("assets/fish.mp3")
+ykwtm = pygame.mixer.Sound("assets/sfx/fish.mp3")
 
 #music
-mus_hotel2 = pygame.mixer.Sound("assets/hotel2.mp3")
-mus_paradise = pygame.mixer.Sound("assets/paradise.mp3")
+mus_hotel2 = pygame.mixer.Sound("assets/mus/hotel2.mp3")
+mus_paradise = pygame.mixer.Sound("assets/mus/paradise.mp3")
 mus_menu = mus_hotel2
