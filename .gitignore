@@ -1,2 +1,2 @@
-*.philooxy
+.saves/*
 __pycache__
