@@ -28,7 +28,7 @@ startAnim = True
 
 #not flags
 startTransitionY = 0 #transition between menu and start
-startTransitionX = 100 #same thing but horizontal
+startTransitionX = 200 #same thing but horizontal
 sunMove = 0
 
 fullscreen = False
@@ -52,6 +52,9 @@ fishingrect = pygame.Rect(WIDTH/2 - 16 + offsetX, HEIGHT/2 - 16 + 16 + offsetY, 
 sunsetCheck = False
 sunriseCheck = False
 upgrade = False
+achs = []
+achs_unlocked = []
+achs_showing = []
 
 #settings variables
 volume = 1 #volume
