@@ -225,11 +225,12 @@ class fishy():
         self.rect = pygame.Rect(WIDTH/2 - 16 + self.pos[0], HEIGHT/2 - 16 + self.pos[1], self.rect[2], self.rect[3])
 
         self.rotate = random.randint(0,4)*90
+        self.bobber = ""
 
         fishes.append(self)
 
     def update(self):
-        global moving, offsetX, offsetY, fishCount, bobberFallAnim, reelAnim, fishes, fishesHeld, maxFishes, fishCaughtArray, catchTimer, scaredCounter, outranFish
+        global moving, offsetX, offsetY, fishCount, bobberFallAnim, reelAnim, fishes, fishesHeld, maxFishes, fishCaughtArray, catchTimer, scaredCounter, outranFish, clickFish
 
         self.image = pygame.image.load(f'{self.imagepath}_{int((self.anim*self.speed/10)%2)}.png')
 
@@ -250,47 +251,39 @@ class fishy():
             self.catchTimer -= 1
 
 
-        if self.rect.colliderect(fishingrect2) and (moving == True or self.caught == True):
-            self.scared = 30
+        #if self.rect.colliderect(fishingrect2) and (moving == True or self.caught == True):
+        #    self.scared = 30
         if self.scared > 0:
             self.speed = 3*self.speed2
 
             if self.caught == False:
-                if self.pos[0] > offsetX:
+                if self.pos[0] > self.bobber.pos[0]:
                     self.dir = 1
-                elif self.pos[0] < offsetX:
+                elif self.pos[0] < self.bobber.pos[0]:
                     self.dir = 2
 
             self.scared -= 1
 
-        if reelAnim == False:
-            if -30 < self.catchTimer <= 0:
-                self.caught = False
+        if self.bobber != "":
+            if self.bobber.reel == False:
+                if -30 < self.catchTimer <= 0:
+                    self.caught = False
 
-            if self.catchTimer == 0:
-                fishCaughtArray.remove(self)
-                self.pos = (self.pos[0], self.pos[1]+(16+-64*random.randint(0,1)))
-                if self.pos[1] < 20:
-                    self.pos = (self.pos[0], 20)
+                if self.catchTimer == 0:
+                    fishCaughtArray.remove(self)
+                    self.pos = (self.pos[0], self.pos[1]+(16+-64*random.randint(0,1)))
+                    if self.pos[1] < 20:
+                        self.pos = (self.pos[0], 20)
 
         if self.dir == 2:
             self.pos = (self.pos[0]-1*self.speed, self.pos[1])
         else:
             self.pos = (self.pos[0]+1*self.speed, self.pos[1])
 
-        if self.rect.colliderect(fishingrect) and self.caught == False and len(fishCaughtArray) < maxFishes:
-            if not(-30 < self.catchTimer <= 0):
-                self.caught = True
-                fishCaughtArray.append(self)
-                if catchTimer < catchtimeupgrade.cap:
-                    self.catchTimer = catchTimer + self.catchTime
-
         if self.caught == True:
-            if moving:
-                outranFish = True
-            self.pos = (offsetX, offsetY+24+11)
-            if offsetY <= 0 and offsetX < -20 and bobberFallAnim == False:
-                reelAnim = True
+            self.pos = (self.bobber.pos[0], self.bobber.pos[1]+24+11)
+            if self.bobber.pos[0] <= -40 and self.bobber.pos[1] <= 0 and self.bobber.cast == False:
+                self.bobber.reel = True
 
         if self.pos[0] > 320 or self.pos[0] < -320 or ((self.pos[1] > 200) and self.caught == False) or 0 < startTransitionY < 100:
             if not(0 < startTransitionY < 100):
@@ -298,6 +291,9 @@ class fishy():
             fishes.remove(self)
 
         self.rect[0], self.rect[1] = WIDTH/2 - 16 + self.pos[0], HEIGHT/2 - 16 + self.pos[1]
+
+        if self.rect.collidepoint(pygame.mouse.get_pos()) and pygame.mouse.get_pressed()[0]:
+            clickFish = True
 
         screen.blit(self.image, self.rect)
 
@@ -403,16 +399,22 @@ class achievement():
         self.hidden = hidden
         achs.append(self)
     def update(self, got):
-        global achs_unlocked, achs, achs_showing
+        global achs_unlocked, achs, achs_showing, showingAch
         
         if got and (self.got2 == "no2"):
-            self.got2 = False
             self.got = True
+            if showingAch == "":
+                showingAch = self
+                self.got2 = False
 
-        if (not(self.got2)) and not(self in achs_unlocked):
+        if (not(self.got2)) and not(self in achs_unlocked) and showingAch == self:
             self.showing = True
             if self.easing == 0:
+                showingAch = self
+                self.got = True
+                #achs_unlocked.append(self)
                 achs_showing.append(self)
+                self.easing += 0.01
             if self.easing <= 5:
                 self.pos = pygame.math.lerp(220, 0, ease(self.easing))
                 self.easing += 0.01
@@ -421,9 +423,11 @@ class achievement():
                 self.easing += 0.01
             elif self.easing == 6.0:
                 self.got2 = True
-                achs_unlocked.append(self)
+                achs_showing.remove(self)
                 self.showing = False
-                easing += 1
+                self.easing += 1
+            else:
+                showingAch = ""
 
             rect = pygame.Rect(-self.pos-5, HEIGHT-75, 220, 75)
             screen.blit(self.bg, rect)
@@ -440,13 +444,33 @@ class achievement():
 
 
     def draw(self, rect):
-        rect, self.icon, check = buttonCheck(rect, self.icon, False)
-        screen.blit(self.icon, rect)
+        if self.got == True:
+            tempicon = self.icon
+        elif self.got == "no":
+            tempicon = ach_locked
+        rect, tempicon, check = buttonCheck(rect, tempicon, False)
+        if check:
+            if self.hidden and self.got == "no":
+                tempname = "???"
+                tempdesc = "???"
+            else:
+                tempname = self.name
+                tempdesc = self.desc
+            name, nameRect = renderText(tempname, ut_s)
+            nameRect.center = (rect[0]+rect[2]/2, rect[1]+rect[3]/2+rect[3])
+            screen.blit(name, nameRect)
+
+            desc, descRect = renderText(tempdesc, ut_xs)
+            descRect.center = (nameRect.center[0], nameRect.center[1]+20)
+            screen.blit(desc, descRect)
+        screen.blit(tempicon, rect)
 
 
 ach_realistic_check = achievement("assets/achs/ach_realistic.png", "Realistic Fishing", "Catch a fish without moving", False)
 ach_scared_check = achievement("assets/achs/ach_scared.png", "Fish Fear Me", "Scare 5 fish off the screen", False)
-ach_outrun_check = achievement("assets/achs/ach_scared.png", "You Can't Run", "Outrun a fish and catch it", False)
+#ach_outrun_check = achievement("assets/achs/ach_outrun.png", "You Can't Run", "Outrun a fish and catch it", False)
+ach_click_check = achievement("assets/achs/ach_click.png", "Not How You Do It", "Click a fish", True)
+showingAch = ""
 load("achs")
 #upgrades
 hookupgrade = shopItem("Hook upgrade", "Increase how much fish you can hold", "assets/upgrade/hookupgrade.png", 50, 25, 3, 50)
@@ -592,7 +616,7 @@ def drawbg():
     screen.fill(skyColor)
 
     if nightCheck:
-        screen.blit(stars, (0,0))
+        screen.blit(stars, (0,0+startTransitionY/10))
 
     if minute != prevMin:
         if 0 <= hour <= 11:
@@ -667,22 +691,6 @@ def drawFishing():
     global wideMode, fisherImage_wide, fishcount, fishCaughtArray, maxFishes
     screen.blit(dockImage, (-2, startTransitionY*6-100))
     screen.blit(dockImage2, (WIDTH - 158, startTransitionY*6-100))
-
-    fisherImage = fisherImage_normal
-    if reelAnim and not(wideMode):
-        fisherImage = fisherImage_pull
-
-    if wideMode:
-        fisherImage = fisherImage_wide
-
-    if not(wideMode):
-        screen.blit(fisherImage, (0, startTransitionY*6-100))
-    else:
-        screen.blit(fisherImage, (-100, startTransitionY*6-100))
-
-    bobberPos = (fishingrect[0], fishingrect[1]-11+startTransitionY*6)
-    pygame.draw.line(screen, (0,0,0), linePos, (bobberPos[0]+15, bobberPos[1]), width=2)
-    screen.blit(bobberImage, bobberPos)
 
     fishCounter, fishCounterRect = renderText(f'Total Fish Caught: {fishCount}', ut)
     fishCounterRect.topright = (WIDTH - 20, 20 + startTransitionY*6)
@@ -772,79 +780,6 @@ def save():
         lines = [f'{int(fullscreen)}\n', f'{int(lowGraphicsMode)}\n', f'{float(volume)}\n', f'\n', f'{int(wideMode)}\n', f'{int(fishSFX)}\n', f'{int(fastSun)}\n']
         f.writelines(lines)
 
-def bobberMove():
-    global moving, offsetX, offsetY, bobberSpeed, moving2, bobberFallAnim
-    pressed_keys = pygame.key.get_pressed()
-
-    moving = False
-
-    if pressed_keys[pygame.K_LEFT] and offsetX > -200:
-        moving = True
-        offsetX -= 1*bobberSpeed
-    if pressed_keys[pygame.K_RIGHT] and offsetX < 200:
-        moving = True
-        offsetX += 1*bobberSpeed
-    if pressed_keys[pygame.K_UP] and offsetY > 0:
-        moving = True
-        offsetY -= 1*bobberSpeed
-    if pressed_keys[pygame.K_DOWN] and offsetY < 200:
-        moving = True
-        offsetY += 1*bobberSpeed
-
-    if pressed_keys[pygame.K_LEFT] and pressed_keys[pygame.K_RIGHT]:
-        moving = False
-    if pressed_keys[pygame.K_UP] and pressed_keys[pygame.K_DOWN]:
-        moving = False
-
-    if moving and not(bobberFallAnim):
-        moving2 = True
-
-def doReelAnim():
-    global reelTime, fishCaughtArray, linePos, bobberFall, bobberReel, xmove_temp, ymove_temp, offsetX, offsetY, fishCount, fishes, bobberFallAnim, reelAnim
-    tempReelTime = reelTime*(len(fishCaughtArray))/2
-    linePos = (140, 91)
-    if bobberReel == 0:
-        xmove_temp = ((WIDTH/2+offsetX)-142)/tempReelTime
-        ymove_temp = ((HEIGHT/2+offsetY)-102)/tempReelTime
-        bobberReel = 1
-    if bobberReel < tempReelTime+1:
-        offsetX -= xmove_temp
-        offsetY -= ymove_temp
-        bobberReel += 1
-    if bobberReel >= tempReelTime+1:
-        bobberFall = 0
-        bobberReel = 0
-
-        while len(fishCaughtArray) > 0:
-            for i in fishes:
-                if i.caught == True:
-                    fishes.remove(i)
-                    fishCaughtArray.remove(i)
-                    i.caught == False
-                    fishCount += 1
-                    fishesHeld.append(i.type)
-        linePos = (150, 101)
-        reelAnim = False
-        bobberFallAnim = True
-
-def doCastAnim():
-    global moving, bobberFall, offsetX, offsetY, exponent, bobberFallAnim, moving2
-    moving2 = True
-    moving = True
-    if bobberFall < 1:
-        offsetX = -169
-        exponent = 10
-        offsetY = -129
-    if bobberFall <= 97:
-        offsetX += 1
-        exponent += 0.05
-        offsetY = 100*math.sin(exponent)-70
-        bobberFall += 1
-    else:
-        offsetY = 0
-        bobberFallAnim = False
-        moving2 = False
-
 def renderText(text, font):
     text = font.render(text, False, (0,0,0))
     rect = text.get_rect()
@@ -855,17 +790,20 @@ def renderText(text, font):
 moving2 = False
 scaredCounter = 0
 outranFish = False
+clickFish = False
 
 def updateAchs():
-    global moving2, reelAnim, scaredCounter, outranFish
+    global moving2, reelAnim, scaredCounter, outranFish, clickFish
     ach_realistic_check.update(not(moving2) and reelAnim)
     ach_scared_check.update(scaredCounter >= 5)
-    ach_outrun_check.update(outranFish)
+    #ach_outrun_check.update(outranFish) #removed because it was buggy
+    ach_click_check.update(clickFish)
 
 def drawAchs():
     homebutton_down.update((WIDTH-120-640+startTransitionX*6.4, HEIGHT-60-1200+startTransitionY*6, 100, 40))
     global achs
-    var = 1
+    for i in range(len(achs)):
+        achs[i].draw( pygame.Rect((1+i%4)*(WIDTH/5)-640+startTransitionX*6.4, (1+int(i/4))*(HEIGHT/5)+(-1200+startTransitionY*6), 32, 32 ) )
 
 def transition(transitionVar, lerpMin, lerpMax, easing, a):
     global lowGraphicsMode
@@ -902,6 +840,148 @@ def transition(transitionVar, lerpMin, lerpMax, easing, a):
 startAnim = True
 
 startTransitionX = 100
+
+
+class bobber():
+    global bobbers, fishScaredRange
+    def __init__(self, controls, fisherPos, fisherFlip, linePos):
+        self.pos = (0,0)
+        bobbers.append(self)
+        self.reel = False
+        self.cast = True
+        self.rect = pygame.Rect(WIDTH/2 - 16 + self.pos[0], HEIGHT/2 - 16 + 16 + self.pos[1], 32, 32)
+        self.scaredRect = pygame.Rect(WIDTH/2 - fishScaredRange + self.pos[0], HEIGHT/2 - fishScaredRange + 16 + self.pos[1], 2*fishScaredRange, 2*fishScaredRange)
+        self.image = bobberImage
+        self.fishCaughtArray = []
+        self.moving = False
+        self.castAnimCounter = 0
+        self.reelAnimCounter = 0
+        self.fisher_normal = fisherImage_normal
+        self.fisher_pull = fisherImage_pull
+        self.controls = controls
+        self.fisherFlip = fisherFlip
+        self.fisherPos = fisherPos
+        self.linePos = linePos
+        self.linePos2 = self.linePos
+        self.exponent = 0
+
+    def update(self):
+        global fishes, fishCaughtAray, maxFishes, outranFish, moving, wideMode
+        for i in fishes:
+            if i.rect.colliderect(self.rect) and not(i.caught) and len(fishCaughtArray) < maxFishes:
+                if not(-30 < i.catchTimer <= 0):
+                    i.caught = True
+                    fishCaughtArray.append(i)
+                    outranFish = True
+                    i.bobber = self
+                    if catchTimer < catchtimeupgrade.cap:
+                        i.catchTimer = catchTimer + i.catchTime
+
+            if i.rect.colliderect(self.scaredRect) and moving:
+                i.scared = 30
+                i.bobber = self
+        bobberPos = (WIDTH/2+self.pos[0]-16, HEIGHT/2+self.pos[1]-16+startTransitionY*6)
+
+        fisherImage = fisherImage_normal
+        if self.reel and not(wideMode):
+            fisherImage = fisherImage_pull
+
+        if wideMode:
+            fisherImage = fisherImage_wide
+
+        if self.fisherFlip:
+            fisherImage = pygame.transform.flip(fisherImage, True, False)
+
+        if not(wideMode):
+            screen.blit(fisherImage, (self.fisherPos[0], startTransitionY*6+self.fisherPos[1]-100))
+        else:
+            screen.blit(fisherImage, (-100, startTransitionY*6+fisherPos[1]-100))
+
+        self.rect = pygame.Rect(WIDTH/2 - 16 + self.pos[0], HEIGHT/2-5 + self.pos[1], 32, 32)
+        self.scaredRect = pygame.Rect(WIDTH/2 - fishScaredRange + self.pos[0], HEIGHT/2 - fishScaredRange + self.pos[1]+11, 2*fishScaredRange, 2*fishScaredRange)
+
+        pygame.draw.line(screen, (0,0,0), (self.linePos[0], self.linePos[1]+startTransitionY*6), (bobberPos[0]+15, bobberPos[1]), width=2)
+        screen.blit(self.image, bobberPos)
+
+    def move(self):
+        global moving, bobberSpeed, moving2
+        pressed_keys = pygame.key.get_pressed()
+
+        moving = False
+
+        if pressed_keys[self.controls[2]] and self.pos[0] > -200:
+            moving = True
+            self.pos = (self.pos[0] - 1*bobberSpeed, self.pos[1])
+        if pressed_keys[self.controls[3]] and self.pos[0] < 200:
+            moving = True
+            self.pos = (self.pos[0] + 1*bobberSpeed, self.pos[1])
+        if pressed_keys[self.controls[0]] and self.pos[1] > 0:
+            moving = True
+            self.pos = (self.pos[0], self.pos[1] - 1*bobberSpeed)
+        if pressed_keys[self.controls[1]] and self.pos[1] < 200:
+            moving = True
+            self.pos = (self.pos[0], self.pos[1] + 1*bobberSpeed)
+
+        if pressed_keys[self.controls[2]] and pressed_keys[self.controls[3]]:
+            moving = False
+        if pressed_keys[self.controls[0]] and pressed_keys[self.controls[1]]:
+            moving = False
+
+        if moving and not(self.cast):
+            moving2 = True
+
+    def castAnim(self):
+        global moving, moving2
+
+        moving = True
+        if self.castAnimCounter < 1:
+            self.pos = (-169, -124)
+            self.exponent = 10
+            self.pos = (self.pos[0], self.pos[1] -129)
+        if self.castAnimCounter <= 97:
+            self.pos = (self.pos[0] + 1, self.pos[1])
+            self.exponent += 0.05
+            self.pos = (self.pos[0], 100*math.sin(self.exponent)-70)
+            self.castAnimCounter += 1
+        else:
+            self.pos = (self.pos[0], 0)
+            self.cast = False
+            moving2 = False
+            self.castAnimCounter = 0
+
+    def reelAnim(self):
+        global reelTime, fishCaughtArray, xmove_temp, ymove_temp, fishCount, fishes
+        tempReelTime = reelTime*(len(fishCaughtArray))/2
+        if not(self.fisherFlip):
+            self.linePos = (self.linePos2[0]-10, self.linePos2[1]-10)
+        else:
+            self.linePos = (self.linePos2[0]+10, self.linePos2[1]-10)
+        if self.reelAnimCounter == 0:
+            xmove_temp = ((WIDTH/2+self.pos[0])-142)/tempReelTime
+            ymove_temp = ((HEIGHT/2+self.pos[1])-102)/tempReelTime
+            self.reelAnimCounter = 1
+        if self.reelAnimCounter < tempReelTime+1:
+            self.pos = (self.pos[0]-xmove_temp, self.pos[1]-ymove_temp)
+            self.reelAnimCounter += 1
+        if self.reelAnimCounter >= tempReelTime+1:
+            self.castAnimCounter = 0
+            self.reelAnimCounter = 0
+
+            while len(fishCaughtArray) > 0:
+                for i in fishes:
+                    if i.caught == True:
+                        fishes.remove(i)
+                        fishCaughtArray.remove(i)
+                        i.caught == False
+                        fishCount += 1
+                        fishesHeld.append(i.type)
+            self.linePos = self.linePos2
+            self.reel = False
+            self.cast = True
+            self.reelAnimCounter = 0
+
+bobber1 = bobber([pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT], (0,0), False, (150, 101))
+#bobber2 = bobber([pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d], (WIDTH-150,0), True, (WIDTH-140, 101))
 
 def main(area):
     global bobberFallAnim, fishingMusic, reelAnim, menuMusic, startTransitionY, startTransitionX, offsetX, offsetY, bobberSpeed, bobberFall, bobberReel, exponent, waterOffset, fishCount, fishingrect, fishingrect2, moving, fishes, cloudOffset, cloudOffset2, reelTime, linePos, fishSpawnCap, fishCaughtArray, fishesHeld, balance, fisherImage, fishSFX, bobberPos, easingY, easingX, run, sunsetCheck, sunriseCheck, nightCheck, lowGraphicsMode, wideMode, fullscreen, startAnim, doRPC, moving2
@@ -950,6 +1030,12 @@ def main(area):
                     name="Philooxy's Phishing",
                 )
 
+        for i in bobbers:
+            i.castAnimCounter = 0
+            i.cast = True
+            exponent = 10
+            i.pos = (-169, -124)
+
         drawTitle()
 
         linePos = (150, 101+startTransitionY*6)
@@ -960,7 +1046,8 @@ def main(area):
                 linePos = (150, 101+startTransitionY*6)
                 drawFishing()
         else:
-            offsetX, offsetY = -169, -124
+            for i in bobbers:
+                i.pos = (-169, -124)
             startAnim = False
 
         startTransitionY, easingY, finishedTransition = transition(startTransitionY, 200, 100, easingY, False)
@@ -995,21 +1082,20 @@ def main(area):
                     name="Philooxy's Phishing",
                 )
 
-        if reelAnim == True and startTransitionY == 0.0:
-            doReelAnim()
-
-        moving = False
-        if bobberFallAnim == True and startTransitionY == 0.0:
-            doCastAnim()
-
-        if bobberFallAnim == False and reelAnim == False and startTransitionY == 0.0:
-            bobberMove()
-
-        fishingrect = pygame.Rect(WIDTH/2 - 16 + offsetX, HEIGHT/2 - 16 + 16 + offsetY, 32, 32)
-        fishingrect2 = pygame.Rect(WIDTH/2 - fishScaredRange + offsetX, HEIGHT/2 - fishScaredRange + 16 + offsetY, 2*fishScaredRange, 2*fishScaredRange)
-
         drawFishing()
 
+        for i in bobbers:
+            if i.reel and startTransitionY == 0:
+                i.reelAnim()
+
+            moving = False
+            if i.cast and startTransitionY == 0:
+                i.castAnim()
+
+            if not(i.cast) and not(i.reel) and startTransitionY == 0.0:
+                i.move()
+            i.update()
+    
         homebutton_up.update((20, 20+startTransitionY*6, 100, 40))
 
         if lowGraphicsMode == True:

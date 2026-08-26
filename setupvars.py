@@ -56,6 +56,7 @@ upgrade = False
 achs = []
 achs_unlocked = []
 achs_showing = []
+bobbers = []
 
 #settings variables
 volume = 1 #volume
@@ -114,6 +115,7 @@ slider_ball = loadify("assets/ui/slider2.png")
 toggle_on = loadify("assets/ui/toggle_on.png")
 toggle_off = loadify("assets/ui/toggle_off.png")
 ach_bg = loadify("assets/achs/bg.png")
+ach_locked = loadify("assets/achs/ach_locked.png")
 
 fisherImage_wide = pygame.transform.scale_by(fisherImage_normal_noon, (2.5, 1))
 
