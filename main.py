@@ -935,9 +935,12 @@ class bobber():
 
         moving = True
         if self.castAnimCounter < 1:
-            self.pos = (-169, -124)
+            if not(self.fisherFlip):
+                self.pos = (-150, -124)
+            else:
+                self.pos = (0, -124)
+            print()
             self.exponent = 10
-            self.pos = (self.pos[0], self.pos[1] -129)
         if self.castAnimCounter <= 97:
             self.pos = (self.pos[0] + 1, self.pos[1])
             self.exponent += 0.05
@@ -945,6 +948,7 @@ class bobber():
             self.castAnimCounter += 1
         else:
             self.pos = (self.pos[0], 0)
+            print(self.pos)
             self.cast = False
             moving2 = False
             self.castAnimCounter = 0
@@ -1034,7 +1038,6 @@ def main(area):
             i.castAnimCounter = 0
             i.cast = True
             exponent = 10
-            i.pos = (-169, -124)
 
         drawTitle()
 
@@ -1046,8 +1049,8 @@ def main(area):
                 linePos = (150, 101+startTransitionY*6)
                 drawFishing()
         else:
-            for i in bobbers:
-                i.pos = (-169, -124)
+            #for i in bobbers:
+            #    i.pos = (-169, -124)
             startAnim = False
 
         startTransitionY, easingY, finishedTransition = transition(startTransitionY, 200, 100, easingY, False)
