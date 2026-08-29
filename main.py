@@ -1,7 +1,7 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame, sys, random, math, time, datetime, json
-from pypresence import Presence
+#from pypresence import Presence #for discord right presence
 from setupvars import *
 
 doRPC = False
@@ -194,12 +194,12 @@ def setVolume(volume):
 
 class fishy():
     def __init__(self):
-        global fishes, fishingrect, fishingrect2
+        global fishes, fishingrect, fishingrect2, fishRarity
 
         #print("You know what that means")
 
         self.pos = (random.randint(-200, 200), random.randint(20, 200))
-        self.type = random.randint(1,5)
+        self.type = random.randint(1,fishRarity)
         if self.type == 3:
             self.type = 2
         else:
@@ -230,7 +230,7 @@ class fishy():
         fishes.append(self)
 
     def update(self):
-        global moving, offsetX, offsetY, fishCount, bobberFallAnim, reelAnim, fishes, fishesHeld, maxFishes, fishCaughtArray, catchTimer, scaredCounter, outranFish, clickFish
+        global moving, offsetX, offsetY, fishCount, bobberFallAnim, reelAnim, fishes, fishesHeld, maxFishes, fishCaughtArray, catchTimer, scaredCounter, outranFish, clickFish, startTransitionX, startTransitionY
 
         self.image = pygame.image.load(f'{self.imagepath}_{int((self.anim*self.speed/10)%2)}.png')
 
@@ -282,15 +282,13 @@ class fishy():
 
         if self.caught == True:
             self.pos = (self.bobber.pos[0], self.bobber.pos[1]+24+11)
-            #if self.bobber.pos[0] <= -40 and self.bobber.pos[1] <= 0 and self.bobber.cast == False:
-            #    self.bobber.reel = True
 
         if self.pos[0] > 320 or self.pos[0] < -320 or ((self.pos[1] > 200) and self.caught == False) or 0 < startTransitionY < 100:
             if not(0 < startTransitionY < 100):
                 scaredCounter += 1
             fishes.remove(self)
 
-        self.rect[0], self.rect[1] = WIDTH/2 - 16 + self.pos[0], HEIGHT/2 - 16 + self.pos[1]
+        self.rect[0], self.rect[1] = WIDTH/2 - 16 + self.pos[0]+640-startTransitionX*6.4, HEIGHT/2 - 16 + self.pos[1]-startTransitionY*6
 
         if self.rect.collidepoint(pygame.mouse.get_pos()) and pygame.mouse.get_pressed()[0]:
             clickFish = True
@@ -300,6 +298,7 @@ class fishy():
 #basic upgrade item
 class shopItem():
     def __init__(self, name, desc, image, cost, costIncrement, increment, cap):
+        global upgradeList
         self.image = pygame.image.load(image)
         self.imagepath = image
         self.cost = cost
@@ -314,9 +313,14 @@ class shopItem():
         self.capCheck = True
         self.capCheck2 = True
         self.bought = 0
+        self.coopBought = 0
+        self.coopMax = False
+        upgradeList.append(self)
 
     def update(self, var, rect):
-        global balance, hovering, startTransitionY, startTransitionX
+        global balance, hovering, startTransitionY, startTransitionX, shop, upgradeList
+
+        coopBuy = False
 
         check = False
         click = False
@@ -325,6 +329,7 @@ class shopItem():
         self.rect, self.image, check = buttonCheck(pygame.Rect(rect), self.image, False)
 
         if check:
+
 
             self.cost = self.cost2 + self.costIncrement*self.bought
 
@@ -340,12 +345,15 @@ class shopItem():
 
             click = checkClick(True)
             if click:
-                if balance - self.cost >= 0:
+                if balance - self.cost >= 0 and not coop:
 
                     if self.capCheck2:
                         self.bought += 1
                         var += self.increment
                         balance -= self.cost
+                elif coop:
+                    var += self.increment
+                    coopBuy = True
 
             desc1, desc1Rect = renderText(self.desc, ut_xs)
             desc1Rect.center = (self.rect.center[0], self.rect.center[1] + self.rect[3]/2 + 10 + 20)
@@ -364,12 +372,14 @@ class shopItem():
                     var2 = var+self.increment
                 desc2Text = f'{var} -> {var2}'
 
-                cost, costRect = renderText(f'Cost: ${self.cost}', ut_xs)
-                costRect.center = (self.rect.center[0], self.rect.center[1] + self.rect[3]/2 + desc1Rect[3]/2 + 20 + 16)
-                screen.blit(cost, costRect)
+                if not coop:
+                    cost, costRect = renderText(f'Cost: ${self.cost}', ut_xs)
+                    costRect.center = (self.rect.center[0], self.rect.center[1] + self.rect[3]/2 + desc1Rect[3]/2 + 20 + 16)
+                    screen.blit(cost, costRect)
 
             else:
                 var = self.cap
+                upgradeList.remove(self)
                 desc2Text = f'MAX ({var})'
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_NO)
 
@@ -383,7 +393,10 @@ class shopItem():
 
         screen.blit(self.image, self.rect)
 
-        return var
+        if not coop:
+            return var
+        else:
+            return var, var, coopBuy
 
 class achievement():
     def __init__(self, icon, name, desc, hidden):
@@ -470,17 +483,19 @@ ach_realistic_check = achievement("assets/achs/ach_realistic.png", "Realistic Fi
 ach_scared_check = achievement("assets/achs/ach_scared.png", "Fish Fear Me", "Scare 5 fish off the screen", False)
 #ach_outrun_check = achievement("assets/achs/ach_outrun.png", "You Can't Run", "Outrun a fish and catch it", False)
 ach_click_check = achievement("assets/achs/ach_click.png", "Not How You Do It", "Click a fish", True)
+ach_notscared_check = achievement("assets/achs/ach_notscared.png", "Fish Don't Fear Me", "Max out the better lure upgrade", False)
 showingAch = ""
 load("achs")
 #upgrades
+reeltimeupgrade = shopItem("Reel time upgrade", "Decrease the time to reel in fish", "assets/upgrade/reelupgrade.png", 25, 15, -5, 10)
 hookupgrade = shopItem("Hook upgrade", "Increase how much fish you can hold", "assets/upgrade/hookupgrade.png", 50, 25, 3, 50)
 spawncapupgrade = shopItem("Max fish upgrade", "Increase how much fish spawn at a time", "assets/upgrade/maxfishupgrade.png", 30, 20, 1, 20)
-reeltimeupgrade = shopItem("Reel time upgrade", "Decrease the time to reel in fish", "assets/upgrade/reelupgrade.png", 25, 15, -5, 10)
 scaredrangeupgrade = shopItem("Better lure", "Decrease the area where fish get scared", "assets/upgrade/scaredrangeupgrade.png", 55, 5, -4, 16)
 catchtimeupgrade = shopItem("Hook glue", "Increase time that fish stay on hook", "assets/upgrade/catchtimeupgrade.png", 40, 20, 20, 200)
 load("bought")
 #buttons
-startbutton = button("fishing", "assets/button/fishbutton.png")
+startbutton = button("single", "assets/button/fishbutton.png")
+coopbutton = button("coop", "assets/button/coopbutton.png")
 shopbutton = button("shop", "assets/button/shopbutton.png")
 settingsbutton = button("settings", "assets/button/settingsbutton.png")
 exitbutton = button("exit", "assets/button/exitbutton.png")
@@ -489,7 +504,7 @@ achbutton = button("achs", "assets/button/achbutton.png")
 
 homebutton = button("title", "assets/button/homebutton.png")
 homebutton_up = button("title", "assets/button/homebutton-up.png")
-homebutton_right = button("title", "assets/button/homebutton-right.png")
+homebutton_right = button("fishing", "assets/button/homebutton-right.png")
 homebutton_down = button("title", "assets/button/homebutton-down.png")
 
 minute, hour = 0, 1
@@ -535,13 +550,14 @@ def checkSunset():
     nightCheck = 22 <= hour <= 23 or 0 <= hour <= 3
 
 def checkSprites():
-    global sunsetCheck, sunriseCheck, nightCheck, cloudsImage2, cloudsImage, fisherImage_normal, fisherImage_pull, fisherImage, dockImage, dockImage2, skyColor, waterImage, waterImage2, sunImage, bobberImage, titleImage
+    global sunsetCheck, sunriseCheck, nightCheck, cloudsImage2, cloudsImage, fisherImage_normal, fisherImage_pull, fisherImage, dockImage, dockImage2, dockImageFull, skyColor, waterImage, waterImage2, sunImage, bobberImage, titleImage, skin_current
 
     cloudsImage2 = cloudsImage2_noon
     cloudsImage = cloudsImage_noon
-    fisherImage_normal = fisherImage_normal_noon
-    fisherImage_pull = fisherImage_pull_noon
+    fisherImage_normal = skin_current[0]
+    fisherImage_pull = skin_current[1]
     dockImage = dockImage_noon
+    dockImageFull = dockImageFull_noon
     skyColor = skyColor_noon
     waterImage = waterImage_noon
     sunImage = sunImage_noon
@@ -551,9 +567,10 @@ def checkSprites():
     if sunsetCheck or sunriseCheck:
         cloudsImage2 = cloudsImage2_sunset
         cloudsImage = cloudsImage_sunset
-        fisherImage_normal = fisherImage_normal_sunset
-        fisherImage_pull = fisherImage_pull_sunset
+        fisherImage_normal = skin_current[2]
+        fisherImage_pull = skin_current[3]
         dockImage = dockImage_sunset
+        dockImageFull = dockImageFull_sunset
         skyColor = skyColor_sunset
         waterImage = waterImage_sunset
         sunImage = sunImage_sunset
@@ -563,9 +580,10 @@ def checkSprites():
     if nightCheck:
         cloudsImage2 = cloudsImage2_night
         cloudsImage = cloudsImage_night
-        fisherImage_normal = fisherImage_normal_night
-        fisherImage_pull = fisherImage_pull_night
+        fisherImage_normal = skin_current[4]
+        fisherImage_pull = skin_current[5]
         dockImage = dockImage_night
+        dockImageFull = dockImageFull_night
         skyColor = skyColor_night
         waterImage = waterImage_night
         sunImage = sunImage_night
@@ -662,15 +680,20 @@ def drawbg():
         i.update()
 
 def drawTitle():
+    global version
     screen.blit(titleImage, (100+700-startTransitionX*7, 50-700+startTransitionY*7))
     startbutton.update((WIDTH/2 - 50+640-startTransitionX*6.4, HEIGHT/2 + 40 - 600 + startTransitionY*6, 100, 40))
-    shopbutton.update((WIDTH/2 - 50+640-startTransitionX*6.4, HEIGHT/2 + 90 - 600 + startTransitionY*6, 100, 40))
+    coopbutton.update((WIDTH/2 - 50+640-startTransitionX*6.4, HEIGHT/2 + 90 - 600 + startTransitionY*6, 100, 40))
     settingsbutton.update((WIDTH/2 - 50+640-startTransitionX*6.4, HEIGHT/2 + 140 - 600 + startTransitionY * 6, 100, 40))
     exitbutton.update((WIDTH/2 - 50+640-startTransitionX*6.4, HEIGHT/2 + 190 - 600 + startTransitionY*6, 100, 40))
     achbutton.update((WIDTH-42+640-startTransitionX*6.4, HEIGHT-42 - 600 +startTransitionY*6, 32, 32))
+    text, rect = renderText(f'v{version}', ut_xs)
+    rect.bottomleft = (10, -600+startTransitionY*6+HEIGHT-5)
+    screen.blit(text, rect)
 
 def drawShop():
     global maxFishes, fishSpawnCap, reelTime, fishScaredRange, catchTimer, fishesHeld, balance
+    screen.blit(dockImageFull, (-startTransitionX*6.4, startTransitionY*6-100))
     maxFishes = hookupgrade.update(maxFishes, (WIDTH/4 - 16-startTransitionX*6.4, HEIGHT/4, 32, 32))
     fishSpawnCap = spawncapupgrade.update(fishSpawnCap, (2*WIDTH/4 - 16-startTransitionX*6.4, HEIGHT/4, 32, 32))
     reelTime = reeltimeupgrade.update(reelTime, (3*WIDTH/4 - 16-startTransitionX*6.4, HEIGHT/4, 32, 32))
@@ -688,20 +711,119 @@ def drawShop():
     screen.blit(balanceCounter, balanceCounterRect)
 
 def drawFishing():
-    global wideMode, fisherImage_wide, fishcount, fishCaughtArray, maxFishes, bobbers
-    screen.blit(dockImage, (-2, startTransitionY*6-100))
-    screen.blit(dockImage2, (WIDTH - 158, startTransitionY*6-100))
+    global wideMode, fisherImage_wide, fishcount, fishCaughtArray, maxFishes, bobbers, area, coopUpgradeList, coopShop, fishRarity, upgradeList, fishReq, coopLevel, coopMaxFishes, prevRandUpgrade, randUpgrade
+    screen.blit(dockImage, (640-startTransitionX*6.4, startTransitionY*6-100))
+    screen.blit(dockImage2, (WIDTH - 158+640-startTransitionX*6.4, startTransitionY*6-100))
 
-    fishCounter, fishCounterRect = renderText(f'Total Fish Caught: {fishCount}', ut)
-    fishCounterRect.topright = (WIDTH - 20, 20 + startTransitionY*6)
-    screen.blit(fishCounter, fishCounterRect)
+    for bobber in range(len(bobbers)):
+        if (not(coop) and bobber == 0) or coop:
 
-    for i in range(len(bobbers)):
-        fishesHelder, fishesHelderRect = renderText(f'P{i+1} Fish Held: {len(bobbers[i].fishCaughtArray)}/{maxFishes}', ut)
-        fishesHelderRect.bottomright = (WIDTH - 20, HEIGHT - 20 -40*i + startTransitionY*6)
-        screen.blit(fishesHelder, fishesHelderRect)
+            if not(coop):
+                tempFishCount = fishCount
+                tempMaxFishes = maxFishes
+                fishCounter, fishCounterRect = renderText(f'Total Fish Caught: {tempFishCount}', ut)
+                fishCounterRect.topright = (WIDTH - 20+640-startTransitionX*6.4, 20 + startTransitionY*6)
 
-    homebutton_up.update((20, 20+startTransitionY*6, 100, 40))
+                shopbutton.update((20+120+640-startTransitionX*6.4, 20+startTransitionY*6, 100, 40))
+
+                fishCounter2, fishCounter2Rect = renderText(f'Fish Caught: {len(fishesHeld2)}', ut)
+                fishCounter2Rect.topright = (WIDTH - 20+640-startTransitionX*6.4, 20 + 40 + startTransitionY*6)
+                screen.blit(fishCounter2, fishCounter2Rect)
+            else:
+                tempFishCount = bobbers[bobber].fishCount
+                tempMaxFishes = bobbers[bobber].upgrades[1][0]
+                fishCounter, fishCounterRect = renderText(f"P{bobber+1}'s Fish: {tempFishCount}", ut)
+                fishCounterRect.bottomleft = (20+640-startTransitionX*6.4, HEIGHT - 15 -20*bobber + startTransitionY*6)
+
+                if bobber == 0:
+                    fishReqCounter = 0
+                    for j in bobbers:
+                        fishReqCounter += j.fishCount
+                    text, rect = renderText(f'Level {coopLevel}: {fishReqCounter}/{fishReq}', ut)
+                    rect.midbottom = (WIDTH/2+640-
+                    startTransitionX*6.4, HEIGHT-20+startTransitionY*6)
+                    screen.blit(text, rect)
+            
+                if fishReqCounter >= fishReq and area == "fishing":
+                    if not coopShop:
+                        coopShop = True
+                        fishRarity += 1
+                        coopLevel += 1
+                        fishReq += 5*(fishReq/5)
+                        fishReq = int(fishReq)
+                        coopUpgradeList = []
+                        for upgrade in range(2):
+                            while prevRandUpgrade == randUpgrade:
+                                randUpgrade = random.randint(0, len(upgradeList)-1)
+                            prevRandUpgrade = randUpgrade
+                            upgrade = upgradeList[randUpgrade]
+                            coopUpgradeList.append([upgrade, randUpgrade])
+
+                    for i in bobbers:
+                        i.moving = False
+                        i.cast = False
+                        i.reel = False
+                        i.fishCaughtArray = []
+                        i.linePos = (i.linePos2[0], i.linePos2[1])
+                        if not(i.fisherFlip):
+                            i.pos = (i.fisherPos[0]-240+97-7-10, -124)
+                        else:
+                            i.pos = (i.fisherPos[0]-240-97+7+10, -124)
+
+            screen.blit(fishCounter, fishCounterRect)
+
+            fishesHelder, fishesHelderRect = renderText(f'P{bobber+1} Fish Held: {len(bobbers[bobber].fishCaughtArray)}/{tempMaxFishes}', ut)
+            fishesHelderRect.bottomright = (WIDTH - 20+640-startTransitionX*6.4, HEIGHT - 15 -20*bobber + startTransitionY*6)
+            screen.blit(fishesHelder, fishesHelderRect)
+
+    if not coopShop:
+        homebutton_up.update((20+640-startTransitionX*6.4, 20+startTransitionY*6, 100, 40))
+
+    cameraStopped = False
+
+    match startTransitionY:
+        case 0 | 100 | 200:
+            match startTransitionX:
+                case 0 | 100 | 200:
+                    cameraStopped = True
+
+
+    for i in bobbers:
+
+        if not cameraStopped:
+            i.castAnimCounter = 0
+            i.cast = True
+            exponent = 10
+            if not(i.fisherFlip):
+                i.pos = (i.fisherPos[0]-240+97-7-10, -124)
+            else:
+                i.pos = (i.fisherPos[0]-240-97+7+10, -124)
+
+        if (not(coop) and i == bobbers[0]) or coop:
+
+            if i.reel and cameraStopped and area == "fishing":
+                i.reelAnim()
+
+            moving = False
+            if i.cast and cameraStopped and area == "fishing":
+                i.castAnim()
+
+            if not(i.cast) and not(i.reel) and cameraStopped and not(coopShop):
+                i.move()
+            i.update()
+
+    if coopShop:
+        screen.blit(cover)
+        for upgrades in range(len(coopUpgradeList)):
+            upgradeType = coopUpgradeList[upgrades][1]
+            if upgradeType == 2:
+                coopMaxFishes, useless, coopBuy = coopUpgradeList[upgrades][0].update(coopMaxFishes, ((upgrades+1)*WIDTH/3, HEIGHT/2-16, 32, 32))
+            else:
+                bobbers[0].upgrades[upgradeType][0], bobbers[1].upgrades[upgradeType][0], coopBuy = coopUpgradeList[upgrades][0].update(bobbers[0].upgrades[upgradeType][0], ((upgrades+1)*WIDTH/3, HEIGHT/2-16, 32, 32))
+            if coopBuy:
+                coopShop = False
+                for k in bobbers:
+                    k.cast = True
 
 def drawToggleSetting(text, coords, var, var_toggle):
     settings, settingsRect = renderText(text, ut)
@@ -788,17 +910,18 @@ def renderText(text, font):
     return text,rect
 
 #achievement-related variables
-moving2 = False
 scaredCounter = 0
 outranFish = False
 clickFish = False
+realisticFishing = False
 
 def updateAchs():
-    global moving2, reelAnim, scaredCounter, outranFish, clickFish
-    ach_realistic_check.update(not(moving2) and reelAnim)
+    global scaredCounter, outranFish, clickFish, realisticFishing, fishScaredRange
+    ach_realistic_check.update(realisticFishing)
     ach_scared_check.update(scaredCounter >= 5)
     #ach_outrun_check.update(outranFish) #removed because it was buggy
     ach_click_check.update(clickFish)
+    ach_notscared_check.update(fishScaredRange == 16)
 
 def drawAchs():
     homebutton_down.update((WIDTH-120-640+startTransitionX*6.4, HEIGHT-60-1200+startTransitionY*6, 100, 40))
@@ -864,33 +987,57 @@ class bobber():
         self.linePos2 = self.linePos
         self.exponent = 0
         self.fishCaughtArray = []
+        self.moving2 = False
+        self.skin = skin
+        self.fishCount = 0
+        self.upgrades = [[60, 0], [3, 0], [0, 0], [48, 0], [70, 0]]
 
     def update(self):
-        global fishes, maxFishes, outranFish, moving, wideMode
+        global fishes, maxFishes, outranFish, moving, wideMode, sunsetCheck, sunriseCheck, nightCheck
         for i in fishes:
-            if i.rect.colliderect(self.rect) and not(i.caught) and len(self.fishCaughtArray) < maxFishes:
+            if not(coop):
+                check = len(self.fishCaughtArray) < maxFishes
+            else:
+                check = len(self.fishCaughtArray) < self.upgrades[1][0]
+            if i.rect.colliderect(self.rect) and not(i.caught) and check:
                 if not(-30 < i.catchTimer <= 0) and not(i.caught):
                     i.caught = True
                     self.fishCaughtArray.append(i)
                     outranFish = True
                     i.bobber = self
-                    if catchTimer < catchtimeupgrade.cap:
+                    if not(coop):
+                        check = catchTimer < catchtimeupgrade.cap
+                    else:
+                        check = self.upgrades[4][0] < catchtimeupgrade.cap
+                    if check:
                         i.catchTimer = catchTimer + i.catchTime
 
-            if i.rect.colliderect(self.scaredRect) and moving:
+            if i.rect.colliderect(self.scaredRect) and self.moving:
                 i.scared = 30
                 if not(i.caught):
                     i.bobber = self
 
         if len(self.fishCaughtArray) > 0 and self.pos[1] == 0:
             if not(self.fisherFlip):
-                if self.fisherPos[0]+160-WIDTH/2 <= self.pos[0] <= self.fisherPos[0]+160+110-WIDTH/2:
+                if self.fisherPos[0]+160-WIDTH/2-40 <= self.pos[0] <= self.fisherPos[0]+160+110-WIDTH/2:
                     self.reel = True
             elif self.fisherFlip:
-                if self.fisherPos[0]-110-WIDTH/2 <= self.pos[0] <= self.fisherPos[0]-WIDTH/2:
+                if self.fisherPos[0]-110-WIDTH/2 <= self.pos[0] <= self.fisherPos[0]-WIDTH/2+40:
                     self.reel = True
 
-        bobberPos = (WIDTH/2+self.pos[0]-16, HEIGHT/2+self.pos[1]-16+startTransitionY*6)
+        bobberPos = (WIDTH/2+self.pos[0]-16+640-startTransitionX*6.4, HEIGHT/2+self.pos[1]-16+startTransitionY*6)
+
+        fisherImage_normal = self.skin[0]
+        fisherImage_pull = self.skin[1]
+
+        if sunsetCheck or sunriseCheck:
+            fisherImage_normal = self.skin[2]
+            fisherImage_pull = self.skin[3]
+        
+        if nightCheck:
+            fisherImage_normal = self.skin[4]
+            fisherImage_pull = self.skin[5]
+
 
         fisherImage = fisherImage_normal
         if self.reel and not(wideMode):
@@ -900,56 +1047,57 @@ class bobber():
         if self.fisherFlip:
             fisherImage = pygame.transform.flip(fisherImage, True, False)
         if not(wideMode):
-            screen.blit(fisherImage, (self.fisherPos[0], startTransitionY*6+self.fisherPos[1]-100))
+            screen.blit(fisherImage, (self.fisherPos[0]+640-startTransitionX*6.4, startTransitionY*6+self.fisherPos[1]-100))
         else:
-            screen.blit(fisherImage, (-100, startTransitionY*6+fisherPos[1]-100))
+            screen.blit(fisherImage, (-100+640-startTransitionX*6.4, startTransitionY*6+self.fisherPos[1]-100))
 
         self.image = bobberImage
 
-        self.rect = pygame.Rect(WIDTH/2 - 16 + self.pos[0], HEIGHT/2-5 + self.pos[1], 32, 32)
-        self.scaredRect = pygame.Rect(WIDTH/2 - fishScaredRange + self.pos[0], HEIGHT/2 - fishScaredRange + self.pos[1]+11, 2*fishScaredRange, 2*fishScaredRange)
+        if not(coop):
+            tempScaredRange = fishScaredRange
+        else:
+            tempScaredRange = self.upgrades[3][0]
 
-        pygame.draw.line(screen, (0,0,0), (self.linePos[0], self.linePos[1]+startTransitionY*6), (bobberPos[0]+15, bobberPos[1]), width=2)
+        self.rect = pygame.Rect(WIDTH/2 - 16 + self.pos[0], HEIGHT/2-5 + self.pos[1], 32, 32)
+        self.scaredRect = pygame.Rect(WIDTH/2 - tempScaredRange + self.pos[0], HEIGHT/2 - tempScaredRange + self.pos[1]+11, 2*tempScaredRange, 2*tempScaredRange)
+
+        pygame.draw.line(screen, (0,0,0), (self.linePos[0]+640-startTransitionX*6.4, self.linePos[1]+startTransitionY*6), (bobberPos[0]+15, bobberPos[1]), width=2)
         screen.blit(self.image, bobberPos)
 
     def move(self):
-        global moving, bobberSpeed, moving2
+        global moving, bobberSpeed, moving2, realisticFishing
         pressed_keys = pygame.key.get_pressed()
 
-        moving = False
+        self.moving = False
 
         if pressed_keys[self.controls[2]] and self.pos[0] > -200:
-            moving = True
+            self.moving = True
             self.pos = (self.pos[0] - 1*bobberSpeed, self.pos[1])
         if pressed_keys[self.controls[3]] and self.pos[0] < 200:
-            moving = True
+            self.moving = True
             self.pos = (self.pos[0] + 1*bobberSpeed, self.pos[1])
         if pressed_keys[self.controls[0]] and self.pos[1] > 0:
-            moving = True
+            self.moving = True
             self.pos = (self.pos[0], self.pos[1] - 1*bobberSpeed)
         if pressed_keys[self.controls[1]] and self.pos[1] < 200:
-            moving = True
+            self.moving = True
             self.pos = (self.pos[0], self.pos[1] + 1*bobberSpeed)
 
         if pressed_keys[self.controls[2]] and pressed_keys[self.controls[3]]:
-            moving = False
+            self.moving = False
         if pressed_keys[self.controls[0]] and pressed_keys[self.controls[1]]:
-            moving = False
+            self.moving = False
 
-        if moving and not(self.cast):
-            moving2 = True
+        if self.moving and not(self.cast):
+            self.moving2 = True
 
         self.tempPos = self.pos
 
     def castAnim(self):
         global moving, moving2
 
-        moving = True
+        self.moving = True
         if self.castAnimCounter < 1:
-            if not(self.fisherFlip):
-                self.pos = (self.fisherPos[0]-240+97-7, -124)
-            else:
-                self.pos = (self.fisherPos[0]-240-97+7, -124)
             self.exponent = 10
         if self.castAnimCounter <= 97:
             if not(self.fisherFlip):
@@ -962,12 +1110,15 @@ class bobber():
         else:
             self.pos = (self.pos[0], 0)
             self.cast = False
-            moving2 = False
+            self.moving2 = False
             self.castAnimCounter = 0
 
     def reelAnim(self):
-        global reelTime, fishCaughtArray, xmove_temp, ymove_temp, fishCount, fishes
-        tempReelTime = reelTime*(len(self.fishCaughtArray))/2
+        global reelTime, fishCaughtArray, xmove_temp, ymove_temp, fishCount, fishes, realisticFishing
+        if not(coop):
+            tempReelTime = reelTime*(len(self.fishCaughtArray))/2
+        else:
+            tempReelTime = self.upgrades[0][0]*(len(self.fishCaughtArray))/2
         if not(self.fisherFlip):
             self.linePos = (self.linePos2[0]-10, self.linePos2[1]-10)
         else:
@@ -976,6 +1127,8 @@ class bobber():
             xmove_temp = ((WIDTH/2-150-self.linePos[0]))/(tempReelTime-1)
             ymove_temp = ((HEIGHT/2-self.linePos[1]))/(tempReelTime-1)
             self.reelAnimCounter = 1
+            if not(self.moving2):
+                realisticFishing = True
         if self.reelAnimCounter < tempReelTime+1:
             self.pos = (pygame.math.lerp(self.tempPos[0], self.linePos[0]-WIDTH/2, self.reelAnimCounter/tempReelTime), pygame.math.lerp(self.tempPos[1], self.linePos[1]-HEIGHT/2+22, self.reelAnimCounter/tempReelTime))
             self.reelAnimCounter += 1
@@ -989,19 +1142,23 @@ class bobber():
                         fishes.remove(i)
                         self.fishCaughtArray.remove(i)
                         i.caught == False
-                        fishCount += 1
-                        fishesHeld.append(i.type)
+                        if not(coop):
+                            fishCount += 1
+                            fishesHeld.append(i.type)
+                            fishesHeld2.append(i)
+                        else:
+                            self.fishCount += 1
             self.linePos = self.linePos2
             self.reel = False
             self.cast = True
             self.reelAnimCounter = 0
+            self.moving2 = False
 
-bobber1 = bobber([pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT], (0,0), False, (150, 101), "normal")
-#bobber2 = bobber([pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d], (WIDTH-150,0), True, (WIDTH-140, 101), "evil")
+bobber1 = bobber([pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT], (0,0), False, (150, 101), skin_soday)
+bobber2 = bobber([pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d], (WIDTH-150,0), True, (WIDTH-140, 101), skin_evilsoday)
 
-def main(area):
-    global bobberFallAnim, fishingMusic, reelAnim, menuMusic, startTransitionY, startTransitionX, offsetX, offsetY, bobberSpeed, bobberFall, bobberReel, exponent, waterOffset, fishCount, fishingrect, fishingrect2, moving, fishes, cloudOffset, cloudOffset2, reelTime, linePos, fishSpawnCap, fishCaughtArray, fishesHeld, balance, fisherImage, fishSFX, bobberPos, easingY, easingX, run, sunsetCheck, sunriseCheck, nightCheck, lowGraphicsMode, wideMode, fullscreen, startAnim, doRPC, moving2
-
+def main():
+    global area, bobberFallAnim, fishingMusic, reelAnim, menuMusic, startTransitionY, startTransitionX, offsetX, offsetY, bobberSpeed, bobberFall, bobberReel, exponent, waterOffset, fishCount, fishingrect, fishingrect2, moving, fishes, cloudOffset, cloudOffset2, reelTime, linePos, fishSpawnCap, fishCaughtArray, fishesHeld, balance, fisherImage, fishSFX, bobberPos, easingY, easingX, run, sunsetCheck, sunriseCheck, nightCheck, lowGraphicsMode, wideMode, fullscreen, startAnim, doRPC, moving2, coop, fishReq, coopShop
     drawbg()
 
     if area == "exit":
@@ -1009,13 +1166,25 @@ def main(area):
         save()
 
     if area == "sell":
-        for i in fishesHeld:
-            if i == 1:
-                balance += 5
-            elif i == 2:
-                balance += 10
-            fishesHeld.remove(i)
+        while len(fishesHeld) > 0:
+            for i in fishesHeld:
+                if i == 1:
+                    balance += 5
+                elif i == 2:
+                    balance += 10
+                fishesHeld.remove(i)
         area = "shop"
+
+    if area == "coop":
+        fishRarity = 1
+        coop = True
+        area = "fishing"
+
+    if area == "single":
+        fishRarity = 5
+        coop = False
+        area = "fishing"
+
 
     if area == "title":
 
@@ -1046,26 +1215,19 @@ def main(area):
                     name="Philooxy's Phishing",
                 )
 
+        coopShop = False
+        fishReqCounter = 0
+
         for i in bobbers:
-            i.castAnimCounter = 0
-            i.cast = True
-            exponent = 10
+            i.fishCaughtArray = []
 
         drawTitle()
-
-        linePos = (150, 101+startTransitionY*6)
 
         startTransitionY, easingY, finishedTransition = transition(startTransitionY, 0, 100, easingY, True)
         if not(finishedTransition):
             if not(startAnim):
-                linePos = (150, 101+startTransitionY*6)
                 drawFishing()
         else:
-            for i in bobbers:
-                if not(i.fisherFlip):
-                    i.pos = (i.fisherPos[0]-240+97-7, -124)
-                else:
-                    i.pos = (i.fisherPos[0]-240-97+7, -124)
             startAnim = False
 
         startTransitionY, easingY, finishedTransition = transition(startTransitionY, 200, 100, easingY, False)
@@ -1100,50 +1262,45 @@ def main(area):
                     name="Philooxy's Phishing",
                 )
 
-        drawFishing()
-
-        for i in bobbers:
-            if i.reel and startTransitionY == 0:
-                i.reelAnim()
-
-            moving = False
-            if i.cast and startTransitionY == 0:
-                i.castAnim()
-
-            if not(i.cast) and not(i.reel) and startTransitionY == 0.0:
-                i.move()
-            i.update()
-    
-        homebutton_up.update((20, 20+startTransitionY*6, 100, 40))
-
         if lowGraphicsMode == True:
             startTransitionY = 0
-            linePos = (150, 101+startTransitionY*6)
+            startTransitionX = 100
+    
+        startTransitionX, easingX, finishedTransition = transition(startTransitionX, 0, 100, easingX, True)
+        if not(finishedTransition):
+            drawShop()
 
         startTransitionY, easingY, finishedTransition = transition(startTransitionY, 100, 0, easingY, False)
         if not(finishedTransition):
             drawTitle()
 
-            linePos = (150, 101+startTransitionY*6)
         else:
-            if len(fishes) < fishSpawnCap:
+            if not coop:
+                tempSpawnCap = fishSpawnCap
+            else:
+                tempSpawnCap = coopMaxFishes
+            if len(fishes) < tempSpawnCap:
                 r = random.randint(1, 100)
                 if r == 33:
                     if fishSFX == True:
                         ykwtm.play()
                     fish = fishy()
 
-    if area == "shop":
+        drawFishing()
 
-        drawShop()
+    if area == "shop":
       
         if lowGraphicsMode == True:
             startTransitionX = 0
 
         startTransitionX, easingX, finishedTransition = transition(startTransitionX, 100, 0, easingX, False)
         if not(finishedTransition):
-            drawTitle()
+            #drawTitle()
+            drawFishing()
         
+        drawShop()
+
+
     if area == "settings":
 
         drawSettings()
@@ -1185,7 +1342,7 @@ while run:
 
     hovering = False
 
-    main(area)
+    main()
 
     updateAchs()
 

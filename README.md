@@ -1,6 +1,4 @@
-<img src="assets/title-noon.png">
-
-<sub>No its not actually phishing its just the name</sub>
+Philooxy's Phishing
 
 Fishing game I made in pygame
 

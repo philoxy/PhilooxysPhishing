@@ -2,3 +2,4 @@
 - cats
 - rain
 - more upgrades
+- 2p mode
