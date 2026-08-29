@@ -759,8 +759,6 @@ def drawFishing():
                             upgrade = upgradeList[randUpgrade]
                             coopUpgradeList.append([upgrade, randUpgrade])
 
-
-
                     for i in bobbers:
                         i.moving = False
                         i.cast = False
