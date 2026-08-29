@@ -6,6 +6,8 @@ Fishing game I made in pygame
 
 * Arrow keys to move the bobber in the water (mouse controls "soon")
 
+* WASD to move 2nd player in coop mode
+
 * Move the bobber to the surface close to your character to reel in fish
 
 * If you move the bobber while a fish is close to you, it will swim away, so stay still when fish are near it
