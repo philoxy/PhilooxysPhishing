@@ -13,27 +13,53 @@ pygame.init()
 pygame.font.init()
 pygame.mixer.init()
 
+oldSave = False
+tempUpgradeLines = []
+
+with open('.saves/save.philooxy', 'r') as f:
+    tempLines = f.readlines()
+    if len(tempLines) != 4:
+        oldSave = True
+
+        for i in range(5):
+            tempUpgradeLines.append(tempLines[2])
+            tempLines.remove(tempLines[2])
+if oldSave:
+    with open('.saves/save.philooxy', 'w') as f:
+        f.writelines(tempLines)
+    with open('.saves/upgrades.philooxy', 'w') as f:
+        f.writelines(tempUpgradeLines)
+        f.write(f'[1, 0]\n')
+
+
 def load(data):
-    global fishesHeld, balance, reelTime, maxFishes, fishSpawnCap, fishScaredRange, catchTimer, fishCount, fullscreen, lowGraphicsMode, volume, theme, wideMode, fishSFX, fastSun, achs
-    with open('.saves/save.philooxy', 'r') as f:
-        lines = f.readlines()
-        if data == "var":
+    global fishesHeld, balance, reelTime, maxFishes, fishSpawnCap, fishScaredRange, catchTimer, fishRarity, fishCount, fullscreen, lowGraphicsMode, volume, theme, wideMode, fishSFX, fastSun, achs
+    if data == "var":
+        with open('.saves/save.philooxy', 'r') as f:
+            lines = f.readlines()
             fishesHeld = json.loads(lines[0])
             balance = int(lines[1])
-            reelTime = json.loads(lines[2])[0]
-            maxFishes = json.loads(lines[3])[0]
-            fishSpawnCap = json.loads(lines[4])[0]
-            fishScaredRange = json.loads(lines[5])[0]
-            catchTimer = json.loads(lines[6])[0]
-            fishCount = int(lines[7])
-        elif data == "bought":
-            reeltimeupgrade.bought = json.loads(lines[2])[1]
-            hookupgrade.bought = json.loads(lines[3])[1]
-            spawncapupgrade.bought = json.loads(lines[4])[1]
-            scaredrangeupgrade.bought = json.loads(lines[5])[1]
-            catchtimeupgrade.bought = json.loads(lines[6])[1]
-        elif data == "achs":
-            achs_temp = json.loads(lines[8])
+            fishCount = int(lines[2])
+        with open('.saves/upgrades.philooxy', 'r') as f:
+            lines = f.readlines()
+            reelTime = json.loads(lines[0])[0]
+            maxFishes = json.loads(lines[1])[0]
+            fishSpawnCap = json.loads(lines[2])[0]
+            fishScaredRange = json.loads(lines[3])[0]
+            catchTimer = json.loads(lines[4])[0]
+            fishRarity = json.loads(lines[5])[0]
+    elif data == "bought":
+        with open('.saves/upgrades.philooxy', 'r') as f:
+            lines = f.readlines()
+            reeltimeupgrade.bought = json.loads(lines[0])[1]
+            hookupgrade.bought = json.loads(lines[1])[1]
+            spawncapupgrade.bought = json.loads(lines[2])[1]
+            scaredrangeupgrade.bought = json.loads(lines[3])[1]
+            catchtimeupgrade.bought = json.loads(lines[4])[1]
+    elif data == "achs":
+        with open('.saves/save.philooxy', 'r') as f:
+            lines = f.readlines()
+            achs_temp = json.loads(lines[3])
             j = 0
             for i in achs:
                 try:
@@ -194,14 +220,20 @@ def setVolume(volume):
 
 class fishy():
     def __init__(self):
-        global fishes, fishingrect, fishingrect2, fishRarity
+        global fishes, fishingrect, fishingrect2, fishRarity, coopLevel, coop
 
         #print("You know what that means")
 
         self.pos = (random.randint(-200, 200), random.randint(20, 200))
-        self.type = random.randint(1,fishRarity)
-        if self.type == 3:
+        if coop:
+            tempFishRarity = coopLevel
+        else:
+            tempFishRarity = fishRarity
+        self.type = random.randint(1,tempFishRarity)
+        if (self.type/3).is_integer():
             self.type = 2
+        elif (self.type/7).is_integer():
+            self.type = 3
         else:
             self.type = 1
         self.dir = random.randint(1, 2)
@@ -487,11 +519,13 @@ ach_notscared_check = achievement("assets/achs/ach_notscared.png", "Fish Don't F
 showingAch = ""
 load("achs")
 #upgrades
-reeltimeupgrade = shopItem("Reel time upgrade", "Decrease the time to reel in fish", "assets/upgrade/reelupgrade.png", 25, 15, -5, 10)
-hookupgrade = shopItem("Hook upgrade", "Increase how much fish you can hold", "assets/upgrade/hookupgrade.png", 50, 25, 3, 50)
+reeltimeupgrade = shopItem("Reel time upgrade", "Decrease the time to reel in fish", "assets/upgrade/reelupgrade.png", 35, 15, -5, 10)
+hookupgrade = shopItem("Hook upgrade", "Increase how much fish you can hold", "assets/upgrade/hookupgrade.png", 40, 25, 3, 50)
 spawncapupgrade = shopItem("Max fish upgrade", "Increase how much fish spawn at a time", "assets/upgrade/maxfishupgrade.png", 30, 20, 1, 20)
 scaredrangeupgrade = shopItem("Better lure", "Decrease the area where fish get scared", "assets/upgrade/scaredrangeupgrade.png", 55, 5, -4, 16)
-catchtimeupgrade = shopItem("Hook glue", "Increase time that fish stay on hook", "assets/upgrade/catchtimeupgrade.png", 40, 20, 20, 200)
+catchtimeupgrade = shopItem("Hook glue", "Increase time that fish stay on hook", "assets/upgrade/catchtimeupgrade.png", 50, 25, 20, 200)
+fishrarityupgrade = shopItem("Luck", "Increase fish rarity", "assets/upgrade/fishrarityupgrade.png", 30, 20, 2, 20)
+upgradeList.remove(fishrarityupgrade)
 load("bought")
 #buttons
 startbutton = button("single", "assets/button/fishbutton.png")
@@ -692,13 +726,14 @@ def drawTitle():
     screen.blit(text, rect)
 
 def drawShop():
-    global maxFishes, fishSpawnCap, reelTime, fishScaredRange, catchTimer, fishesHeld, balance
+    global maxFishes, fishSpawnCap, reelTime, fishScaredRange, catchTimer, fishesHeld, balance, fishRarity
     screen.blit(dockImageFull, (-startTransitionX*6.4, startTransitionY*6-100))
     maxFishes = hookupgrade.update(maxFishes, (WIDTH/4 - 16-startTransitionX*6.4, HEIGHT/4, 32, 32))
     fishSpawnCap = spawncapupgrade.update(fishSpawnCap, (2*WIDTH/4 - 16-startTransitionX*6.4, HEIGHT/4, 32, 32))
     reelTime = reeltimeupgrade.update(reelTime, (3*WIDTH/4 - 16-startTransitionX*6.4, HEIGHT/4, 32, 32))
     fishScaredRange = scaredrangeupgrade.update(fishScaredRange, (WIDTH/4 - 16-startTransitionX*6.4, 2*HEIGHT/4, 32, 32))
     catchTimer = catchtimeupgrade.update(catchTimer, (2*WIDTH/4 - 16-startTransitionX*6.4, 2*HEIGHT/4, 32, 32))
+    fishRarity = fishrarityupgrade.update(fishRarity, (3*WIDTH/4 - 16-startTransitionX*6.4, 2*HEIGHT/4, 32, 32))
     homebutton_right.update((30-startTransitionX*6.4, 20, 100, 40))
     sellbutton.update((30-startTransitionX*6.4, HEIGHT - 60, 100, 40))
 
@@ -711,7 +746,7 @@ def drawShop():
     screen.blit(balanceCounter, balanceCounterRect)
 
 def drawFishing():
-    global wideMode, fisherImage_wide, fishcount, fishCaughtArray, maxFishes, bobbers, area, coopUpgradeList, coopShop, fishRarity, upgradeList, fishReq, coopLevel, coopMaxFishes, prevRandUpgrade, randUpgrade
+    global wideMode, fisherImage_wide, fishcount, fishCaughtArray, maxFishes, bobbers, area, coopUpgradeList, coopShop, fishRarity, upgradeList, fishReq, coopLevel, coopMaxFishes, prevRandUpgrade, randUpgrade, coopFishCount
     screen.blit(dockImage, (640-startTransitionX*6.4, startTransitionY*6-100))
     screen.blit(dockImage2, (WIDTH - 158+640-startTransitionX*6.4, startTransitionY*6-100))
 
@@ -736,15 +771,11 @@ def drawFishing():
                 fishCounterRect.bottomleft = (20+640-startTransitionX*6.4, HEIGHT - 15 -20*bobber + startTransitionY*6)
 
                 if bobber == 0:
-                    fishReqCounter = 0
-                    for j in bobbers:
-                        fishReqCounter += j.fishCount
-                    text, rect = renderText(f'Level {coopLevel}: {fishReqCounter}/{fishReq}', ut)
-                    rect.midbottom = (WIDTH/2+640-
-                    startTransitionX*6.4, HEIGHT-20+startTransitionY*6)
+                    text, rect = renderText(f'Level {coopLevel}: {coopFishCount}/{fishReq}$', ut)
+                    rect.midbottom = (WIDTH/2+640-startTransitionX*6.4, HEIGHT-20+startTransitionY*6)
                     screen.blit(text, rect)
             
-                if fishReqCounter >= fishReq and area == "fishing":
+                if coopFishCount >= fishReq and area == "fishing":
                     if not coopShop:
                         coopShop = True
                         fishRarity += 1
@@ -752,7 +783,14 @@ def drawFishing():
                         fishReq += 5*(fishReq/5)
                         fishReq = int(fishReq)
                         coopUpgradeList = []
-                        for upgrade in range(2):
+                        coopFishCount = 0
+                        if len(upgradeList) <= 0:
+                            coopShop = False
+                        if len(upgradeList) == 1:
+                            tempRange = 1
+                        if len(upgradeList) >= 2:
+                            tempRange = 2
+                        for upgrade in range(tempRange):
                             while prevRandUpgrade == randUpgrade:
                                 randUpgrade = random.randint(0, len(upgradeList)-1)
                             prevRandUpgrade = randUpgrade
@@ -822,6 +860,8 @@ def drawFishing():
                 bobbers[0].upgrades[upgradeType][0], bobbers[1].upgrades[upgradeType][0], coopBuy = coopUpgradeList[upgrades][0].update(bobbers[0].upgrades[upgradeType][0], ((upgrades+1)*WIDTH/3, HEIGHT/2-16, 32, 32))
             if coopBuy:
                 coopShop = False
+                if bobbers[0].upgrades[upgradeType][0] == coopUpgradeList[upgrades][0].cap:
+                    upgradeList.remove[upgrades]
                 for k in bobbers:
                     k.cast = True
 
@@ -883,22 +923,26 @@ def drawSettings():
     homebutton.update((20+tempOffsetX, 20, 100, 40))
 
 def save():
-    global balance, reelTime, maxFishes, fishSpawnCap, fishScaredRange, catchTimer, fishCount, fishesHeld, reeltimeupgrade, fullscreen, lowGraphicsMode, volume, theme, wideMode, fishSFX, fastSun, achs
+    global balance, reelTime, maxFishes, fishSpawnCap, fishScaredRange, catchTimer, fishRarity, fishCount, fishesHeld, reeltimeupgrade, fullscreen, lowGraphicsMode, volume, theme, wideMode, fishSFX, fastSun, achs
     achs_temp = []
     with open('.saves/save.philooxy', 'w') as f:
+        for i in achs:
+            if i.got == "no":
+                i.got = 0
+            achs_temp.append(int(i.got))
+        saveLines = [f'{fishesHeld}\n', f'{balance}\n', f'{fishCount}\n', f'{achs_temp}\n']
+        f.writelines(saveLines)
+
+    with open('.saves/upgrades.philooxy', 'w') as f:
         reelTime = [reelTime, reeltimeupgrade.bought]
         maxFishes = [maxFishes, hookupgrade.bought]
         fishSpawnCap = [fishSpawnCap, spawncapupgrade.bought]
         fishScaredRange = [fishScaredRange, scaredrangeupgrade.bought]
         catchTimer = [catchTimer, catchtimeupgrade.bought]
-        lines = [f'{balance}\n', f'{reelTime}\n', f'{maxFishes}\n', f'{fishSpawnCap}\n', f'{fishScaredRange}\n', f'{catchTimer}\n', f'{fishCount}\n']
-        f.write(f'{fishesHeld}\n')
-        f.writelines(lines)
-        for i in achs:
-            if i.got == "no":
-                i.got = 0
-            achs_temp.append(int(i.got))
-        f.write(f'{achs_temp}\n')
+        fishRarity = [fishRarity, fishrarityupgrade.bought]
+        upgradeLines = [f'{reelTime}\n', f'{maxFishes}\n', f'{fishSpawnCap}\n', f'{fishScaredRange}\n', f'{catchTimer}\n', f'{fishRarity}\n']
+        f.writelines(upgradeLines)
+
     with open('settings.philooxy', 'w') as f:
         lines = [f'{int(fullscreen)}\n', f'{int(lowGraphicsMode)}\n', f'{float(volume)}\n', f'\n', f'{int(wideMode)}\n', f'{int(fishSFX)}\n', f'{int(fastSun)}\n']
         f.writelines(lines)
@@ -1114,7 +1158,7 @@ class bobber():
             self.castAnimCounter = 0
 
     def reelAnim(self):
-        global reelTime, fishCaughtArray, xmove_temp, ymove_temp, fishCount, fishes, realisticFishing
+        global reelTime, fishCaughtArray, xmove_temp, ymove_temp, fishCount, fishes, realisticFishing, coopFishCount
         if not(coop):
             tempReelTime = reelTime*(len(self.fishCaughtArray))/2
         else:
@@ -1147,7 +1191,12 @@ class bobber():
                             fishesHeld.append(i.type)
                             fishesHeld2.append(i)
                         else:
-                            self.fishCount += 1
+                            if i.type == 1:
+                                coopFishCount += 5
+                            elif i.type == 2:
+                                coopFishCount += 10
+                            elif i.type == 3:
+                                coopFishCount += 20
             self.linePos = self.linePos2
             self.reel = False
             self.cast = True
@@ -1172,16 +1221,16 @@ def main():
                     balance += 5
                 elif i == 2:
                     balance += 10
+                elif i == 3:
+                    balance += 20
                 fishesHeld.remove(i)
         area = "shop"
 
     if area == "coop":
-        fishRarity = 1
         coop = True
         area = "fishing"
 
     if area == "single":
-        fishRarity = 5
         coop = False
         area = "fishing"
 

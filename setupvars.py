@@ -63,11 +63,13 @@ fishesHeld2 = []
 fishReq = 0
 coopShop = False
 upgradeList = []
+upgradeList2 = []
 coopUpgradeList = []
-fishRarity = 5
-fishReq = 5
+fishRarity = 1
+fishReq = 25
 coopLevel = 1
 coopMaxFishes = 5
+coopFishCount = 0
 prevRandUpgrade = ""
 randUpgrade = ""
 
@@ -165,7 +167,7 @@ titleImage = titleImage_noon
 dockImage2 = pygame.transform.flip(dockImage, True, False)
 waterImage2 = waterImage
 fisherImage = fisherImage_normal
-version = "0.7.0"
+version = "0.8.1"
 coop = False
 
 #sounds
