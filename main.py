@@ -780,9 +780,11 @@ def drawFishing():
                         coopShop = True
                         fishRarity += 1
                         coopLevel += 1
-                        fishReq += 5*(fishReq/5)
-                        fishReq = int(fishReq)
+                        fishReq += 25
+                        fishReq = fishReq
                         coopUpgradeList = []
+                        for j in bobbers:
+                            j.fishCaughtArray.clear()
                         coopFishCount = 0
                         if len(upgradeList) <= 0:
                             coopShop = False
@@ -1197,6 +1199,7 @@ class bobber():
                                 coopFishCount += 10
                             elif i.type == 3:
                                 coopFishCount += 20
+                            self.fishCount += 1
             self.linePos = self.linePos2
             self.reel = False
             self.cast = True
